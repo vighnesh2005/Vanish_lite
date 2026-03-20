@@ -8,12 +8,16 @@ enum Mode {
     SECURE,
     PRIVACY,
     EXAM,
-    INVALID
+    INVALID,
+    ONLINE
 };
 
 Mode parseMode(const std::string& modeStr);
 
 void applyPolicies(const std::string& username, Mode mode);
+
 void cleanupPolicies(const std::string& username);
+
+
 
 #endif

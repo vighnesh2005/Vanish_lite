@@ -1,8 +1,38 @@
 #include <iostream>
 #include <unistd.h>
 #include "session.h"
+#include "session_manager.h"
+#include <vector>
+#include "utils.h"
 
 using namespace std;
+
+void showStatus(){
+
+    std::vector<SessionInfo> sessions = getActiveSessions();
+
+    if(sessions.empty()){
+        std::cout << "No active sessions.\n";
+        return;
+    }
+
+    std::cout << "\nActive Sessions\n";
+    std::cout << "-----------------------------------\n";
+
+    long now = getCurrentTimestamp();
+
+    for(auto &s : sessions){
+
+        long minutes = (now - s.start_time) / 60;
+
+        std::cout
+        << s.username << "   "
+        << s.mode << "   "
+        << minutes << " min\n";
+    }
+
+    std::cout << std::endl;
+}
 
 int main(int argc, char* argv[]) {
 
@@ -15,6 +45,7 @@ int main(int argc, char* argv[]) {
         cout << "Usage:\n";
         cout << "  sudo vanish start <mode>\n";
         cout << "  sudo vanish stop\n";
+        cout << "  sudo vanish status\n";
         cout << "Modes: dev | secure | privacy | exam\n";
         return 1;
     }
@@ -40,11 +71,16 @@ int main(int argc, char* argv[]) {
         createSession(mode);
     }
     else if (command == "stop") {
+
         stopSession();
     }
+    else if (command == "status") {
+
+        showStatus();
+    }
     else {
+
         cout << "Invalid command.\n";
     }
-
     return 0;
 }
