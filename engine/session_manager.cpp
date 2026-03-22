@@ -1,19 +1,23 @@
 #include "session_manager.h"
+#include "policy_enforcer.h"
 #include "utils.h"
 
 #include <fstream>
 #include <filesystem>
 #include <sstream>
+#include <regex>
+#include <set>
 
 using namespace std;
 
 const string SESSION_DIR = "/var/vanish_sessions/";
+const string MANAGED_USERS_FILE = "/var/vanish_sessions/.managed_users";
 
 /* -------------------------
    CREATE SESSION RECORD
 ------------------------- */
 
-void createSessionRecord(const string& username, const string& mode){
+void createSessionRecord(const string& username, const string& mode, bool persistUntilShutdown){
 
     filesystem::create_directories(SESSION_DIR);
 
@@ -28,6 +32,7 @@ void createSessionRecord(const string& username, const string& mode){
     file << "start_time=" << now << endl;
     file << "last_active=" << now << endl;
     file << "duration=7200" << endl; // default 2 hours
+    file << "persist_until_shutdown=" << (persistUntilShutdown ? "1" : "0") << endl;
 
     file.close();
 }
@@ -111,6 +116,9 @@ SessionInfo parseSessionFile(const string& path){
 
         else if(line.find("duration=") == 0)
             info.duration = stol(line.substr(9));
+
+        else if(line.find("persist_until_shutdown=") == 0)
+            info.persist_until_shutdown = (line.substr(23) == "1");
     }
 
     return info;
@@ -128,7 +136,11 @@ vector<SessionInfo> getActiveSessions(){
         return sessions;
 
     for(auto &entry : filesystem::directory_iterator(SESSION_DIR)){
-
+        string name = entry.path().filename().string();
+        static const regex userPattern("^[a-z_][a-z0-9_-]{0,30}$");
+        if (!regex_match(name, userPattern)) {
+            continue;
+        }
         sessions.push_back(parseSessionFile(entry.path()));
     }
 
@@ -145,6 +157,8 @@ void cleanupExpiredSessions(long logoutTimeout, long examDuration){
 
     long now = getCurrentTimestamp();
 
+    set<string> usersToDelete;
+
     for(auto &s : sessions){
 
         bool logoutExpired =
@@ -153,20 +167,42 @@ void cleanupExpiredSessions(long logoutTimeout, long examDuration){
         bool examExpired =
             (now - s.start_time) > examDuration;
 
-        if(logoutExpired || examExpired){
-
-            string cmd =
-            "pkill -u " + s.username + " 2>/dev/null";
-
-            system(cmd.c_str());
-
-            cmd = "userdel -r " + s.username + " 2>/dev/null";
-
-            system(cmd.c_str());
-
-            deleteSessionRecord(s.username);
-
-            writeLog("Session expired and removed: " + s.username);
+        if (s.persist_until_shutdown) {
+            logoutExpired = false;
+            examExpired = false;
         }
+
+        if(logoutExpired || examExpired){
+            usersToDelete.insert(s.username);
+        }
+    }
+
+    for (const auto& user : usersToDelete) {
+        cleanupPolicies(user);
+        system(("pkill -9 -u " + user + " 2>/dev/null").c_str());
+        system(("loginctl terminate-user " + user + " 2>/dev/null").c_str());
+        system(("umount -l /home/" + user + "/submit 2>/dev/null").c_str());
+        system(("userdel -f -r " + user + " 2>/dev/null").c_str());
+
+        deleteSessionRecord(user);
+        filesystem::remove(SESSION_DIR + user + ".policy.conf");
+        filesystem::remove(SESSION_DIR + user + ".online.conf");
+        filesystem::remove(SESSION_DIR + user + ".monitor.conf");
+        filesystem::remove(SESSION_DIR + user + ".limits.intent");
+        filesystem::remove(SESSION_DIR + user + ".report.json");
+
+        // Remove user from managed registry.
+        if (filesystem::exists(MANAGED_USERS_FILE)) {
+            ifstream in(MANAGED_USERS_FILE);
+            vector<string> keep;
+            string line;
+            while (getline(in, line)) {
+                if (line != user && !line.empty()) keep.push_back(line);
+            }
+            ofstream out(MANAGED_USERS_FILE);
+            for (const auto& entry : keep) out << entry << "\n";
+        }
+
+        writeLog("Session expired and removed: " + user);
     }
 }

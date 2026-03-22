@@ -6,6 +6,7 @@
 #include <fstream>
 #include <filesystem>
 #include <sstream>
+#include <regex>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -28,54 +29,8 @@ void initializeVanishSystem() {
 
     /* create required directories */
 
-    system("mkdir -p /etc/vanish");
     system("mkdir -p /var/vanish_sessions");
     system("mkdir -p /var/vanish_exam_submissions");
-
-    /* =========================
-       CREATE DEFAULT CONFIG
-       ========================= */
-
-    if (!fileExists("/etc/vanish/monitor.conf")) {
-
-        ofstream config("/etc/vanish/monitor.conf");
-
-        config << "# ======================\n";
-        config << "# VANISH MONITOR CONFIG\n";
-        config << "# ======================\n\n";
-
-        config << "# BANNED COMMANDS\n";
-        config << "cmd:curl\n";
-        config << "cmd:wget\n";
-        config << "cmd:python\n";
-        config << "cmd:python3\n";
-        config << "cmd:git\n";
-        config << "cmd:gcc\n";
-        config << "cmd:g++\n";
-        config << "cmd:node\n\n";
-
-        config << "# BANNED WEBSITES\n";
-        config << "site:chat.openai.com\n";
-        config << "site:stackoverflow.com\n";
-        config << "site:github.com\n\n";
-
-        config.close();
-    }
-
-    if (!fileExists("/etc/vanish/online.conf")) {
-        ofstream config("/etc/vanish/online.conf");
-
-        config << "# Allowed sites\n";
-        config << "allow:docs.python.org\n";
-        config << "allow:cplusplus.com\n\n";
-
-        config << "# Blocked sites\n";
-        config << "block:chat.openai.com\n";
-        config << "block:stackoverflow.com\n";
-        config << "block:github.com\n";
-
-        config.close();
-    }   
 
     /* =========================
        CREATE LOG FILE
@@ -88,9 +43,6 @@ void initializeVanishSystem() {
        SET PERMISSIONS
        ========================= */
 
-    system("chmod 700 /etc/vanish");
-    system("chmod 600 /etc/vanish/monitor.conf 2>/dev/null");
-
     system("chmod 700 /var/vanish_sessions");
     system("chmod 700 /var/vanish_exam_submissions");
 
@@ -100,7 +52,6 @@ void initializeVanishSystem() {
        OWNERSHIP (ROOT)
        ========================= */
 
-    system("chown root:root /etc/vanish");
     system("chown root:root /var/vanish_sessions");
     system("chown root:root /var/vanish_exam_submissions");
 }
@@ -155,33 +106,24 @@ void writeLog(const string& message){
 }
 
 /* -------------------------
-   FILE UTILITIES
-------------------------- */
-
-bool fileExists(const string& path){
-
-    return filesystem::exists(path);
-}
-
-/* -------------------------
    SESSION UTILITIES
 ------------------------- */
 
 vector<string> listVanishUsers(){
 
     vector<string> users;
+    const string sessionDir = "/var/vanish_sessions";
+    static const regex userPattern("^[a-z_][a-z0-9_-]{0,30}$");
 
-    ifstream passwd("/etc/passwd");
+    if (!filesystem::exists(sessionDir)) {
+        return users;
+    }
 
-    string line;
-
-    while(getline(passwd, line)){
-
-        if(line.find("vanish_") == 0){
-
-            string username = line.substr(0, line.find(":"));
-
-            users.push_back(username);
+    for (const auto& entry : filesystem::directory_iterator(sessionDir)) {
+        if (!entry.is_regular_file()) continue;
+        string name = entry.path().filename().string();
+        if (regex_match(name, userPattern)) {
+            users.push_back(name);
         }
     }
 

@@ -10,9 +10,10 @@ struct SessionInfo {
     long start_time;
     long last_active;
     long duration;
+    bool persist_until_shutdown = false;
 };
 
-void createSessionRecord(const std::string& username, const std::string& mode);
+void createSessionRecord(const std::string& username, const std::string& mode, bool persistUntilShutdown);
 void deleteSessionRecord(const std::string& username);
 void updateSessionActivity(const std::string& username);
 
