@@ -1,0 +1,19 @@
+# C++ / system prerequisites for Project Vanish Lite
+# Target environment: Linux with root access for runtime operations
+
+# Build toolchain
+g++
+make
+
+# Runtime shell / user-management / system utilities
+bash
+coreutils
+procps
+util-linux
+passwd
+systemd
+iptables
+dbus-x11
+
+# Helpful for bundled validation scripts
+ripgrep

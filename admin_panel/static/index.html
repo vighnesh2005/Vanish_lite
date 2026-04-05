@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vanish Admin Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <main class="layout">
+    <header class="hero">
+      <p class="eyebrow">Project Vanish Lite</p>
+      <h1>Admin Control Panel</h1>
+      <p class="sub">Manage disposable sessions, apply modes, and monitor logs in one place.</p>
+    </header>
+
+    <section class="card controls">
+      <h2>Session Controls</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label for="mode-select">Start mode</label>
+          <select id="mode-select">
+            <option value="dev">dev</option>
+            <option value="secure">secure</option>
+            <option value="privacy">privacy</option>
+            <option value="exam">exam</option>
+            <option value="online">online</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="username-input">Username (optional)</label>
+          <input id="username-input" type="text" placeholder="leave empty for auto">
+        </div>
+        <div class="field">
+          <label for="password-input">Password (optional)</label>
+          <input id="password-input" type="text" placeholder="leave empty for default">
+        </div>
+        <div class="field">
+          <label for="proc-limit-input">Process Limit Override</label>
+          <input id="proc-limit-input" type="number" min="1" placeholder="optional">
+        </div>
+      </div>
+      <div class="controls-row">
+        <label class="switch sticky-pref"><input id="persist-until-shutdown" type="checkbox"><span>Persist Until System Shutdown (do not expire on logout)</span></label>
+      </div>
+      <div class="controls-row">
+        <select id="preset-select">
+          <option value="">Select preset</option>
+        </select>
+        <button id="load-preset-btn" class="btn ghost">Load Preset</button>
+        <button id="save-preset-btn" class="btn ghost">Save Current as Preset</button>
+        <button id="delete-preset-btn" class="btn danger">Delete Preset</button>
+      </div>
+      <section id="mode-description" class="mode-description">
+        <h3 id="mode-desc-title">Mode: dev</h3>
+        <p id="mode-desc-summary">Default lightweight disposable session with minimal restrictions.</p>
+        <ul id="mode-desc-list" class="mode-desc-list"></ul>
+      </section>
+
+      <div class="toggle-sections">
+        <article class="toggle-card mode-card" data-mode="exam">
+          <h3>Exam Mode Options</h3>
+          <label class="switch"><input id="exam-restrict-network" type="checkbox" checked><span>Restrict network</span></label>
+          <label class="switch"><input id="exam-disable-usb" type="checkbox" checked><span>Disable USB</span></label>
+          <label class="switch"><input id="exam-enable-persistence" type="checkbox" checked><span>Enable submit persistence</span></label>
+        </article>
+
+        <article class="toggle-card mode-card" data-mode="online">
+          <h3>Online Mode Options</h3>
+          <label class="switch"><input id="online-enable-network" type="checkbox" checked><span>Enable online network (HTTP/HTTPS/DNS)</span></label>
+          <label class="switch"><input id="online-enable-dns-filtering" type="checkbox" checked><span>Enable DNS host blocking</span></label>
+          <label class="switch"><input id="online-disable-usb" type="checkbox" checked><span>Disable USB</span></label>
+          <label class="switch"><input id="online-enable-persistence" type="checkbox" checked><span>Enable submit persistence</span></label>
+          <label class="switch"><input id="online-enable-command-restriction" type="checkbox"><span>Enable command restriction</span></label>
+
+          <div class="config-buttons">
+            <button type="button" class="btn ghost mini config-toggle-btn" data-target="online-allow-wrap">Edit Allowed Sites</button>
+            <button type="button" class="btn ghost mini config-toggle-btn" data-target="online-block-wrap">Edit Blocked Sites</button>
+            <button type="button" class="btn ghost mini config-toggle-btn" data-target="online-commands-wrap">Edit Blocked Commands</button>
+          </div>
+
+          <div id="online-allow-wrap" class="config-editor-wrap hidden">
+            <label class="stacked" for="online-allow-sites">Allowed Sites (comma/new line)</label>
+            <textarea id="online-allow-sites" class="code-editor-input" rows="8" placeholder="docs.python.org, cplusplus.com"></textarea>
+          </div>
+
+          <div id="online-block-wrap" class="config-editor-wrap hidden">
+            <label class="stacked" for="online-block-sites">Blocked Sites (comma/new line)</label>
+            <textarea id="online-block-sites" class="code-editor-input" rows="8" placeholder="chat.openai.com, github.com"></textarea>
+          </div>
+
+          <div id="online-commands-wrap" class="config-editor-wrap hidden">
+            <label class="stacked" for="online-block-commands">Blocked Commands (comma/new line)</label>
+            <textarea id="online-block-commands" class="code-editor-input" rows="8" placeholder="curl, wget, git, python3"></textarea>
+          </div>
+        </article>
+
+        <article class="toggle-card mode-card" data-mode="privacy">
+          <h3>Privacy Mode Options</h3>
+          <label class="switch"><input id="privacy-enable-ram-home" type="checkbox" checked><span>Enable RAM home</span></label>
+          <label class="stacked" for="privacy-ram-size-mb">RAM Mount Size (MB)</label>
+          <input id="privacy-ram-size-mb" type="number" min="128" step="128" value="2048">
+          <label class="switch"><input id="privacy-enable-dns" type="checkbox" checked><span>Apply privacy DNS</span></label>
+          <label class="switch"><input id="privacy-block-telemetry" type="checkbox" checked><span>Block telemetry</span></label>
+          <label class="switch"><input id="privacy-apply-dark-theme" type="checkbox" checked><span>Apply dark theme</span></label>
+        </article>
+      </div>
+      <p id="mode-hint" class="mode-hint">No extra options for this mode.</p>
+
+      <div class="controls-row">
+        <button id="validate-btn" class="btn ghost">Validate Config</button>
+        <button id="dry-run-btn" class="btn ghost">Dry Run</button>
+        <button id="start-btn" class="btn primary">Start Session</button>
+        <button id="stop-btn" class="btn danger">Stop All</button>
+      </div>
+      <p id="action-status" class="status-line">Ready.</p>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <div class="card-head">
+          <h2>Active Sessions</h2>
+          <button id="refresh-btn" class="btn ghost">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Mode</th>
+                <th>Running</th>
+                <th>Time Left</th>
+                <th>Persist</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="sessions-body"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card logs-card">
+        <div class="card-head">
+          <h2>Live Logs</h2>
+          <span class="pill" id="session-count">0 sessions</span>
+        </div>
+        <pre id="logs-box" class="logs"></pre>
+      </article>
+    </section>
+
+    <section id="config-viewer" class="card config-viewer hidden">
+      <div class="card-head">
+        <h2 id="config-title">Session Config Snapshot</h2>
+        <button id="close-config-btn" class="btn ghost mini">Close</button>
+      </div>
+      <pre id="config-box" class="logs"></pre>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

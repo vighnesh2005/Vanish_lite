@@ -1,0 +1,5 @@
+# This project does not require any third-party Python packages.
+# The admin panel and Python tests use only the Python standard library.
+#
+# Recommended interpreter:
+# python>=3.10

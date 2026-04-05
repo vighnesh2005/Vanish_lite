@@ -1,0 +1,27 @@
+{
+  "online-preset": {
+    "mode": "online",
+    "username": "vighnesh1234",
+    "password": "123456789",
+    "persist_until_shutdown": false,
+    "config": {
+      "exam_restrict_network": true,
+      "exam_disable_usb": true,
+      "exam_enable_persistence": true,
+      "online_enable_network": true,
+      "online_enable_dns_filtering": true,
+      "online_disable_usb": true,
+      "online_enable_persistence": true,
+      "online_enable_command_restriction": false,
+      "online_allow_sites": "https://www.w3schools.com/nodejs/\nhttps://www.python.org/",
+      "online_block_sites": "https://chatgpt.com/",
+      "online_block_commands": "curl",
+      "privacy_enable_ram_home": true,
+      "privacy_ram_home_size_mb": 2048,
+      "privacy_enable_privacy_dns": true,
+      "privacy_block_telemetry": true,
+      "privacy_apply_dark_theme": true,
+      "proc_limit_override": null
+    }
+  }
+}
