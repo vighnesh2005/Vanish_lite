@@ -342,6 +342,14 @@ class AdminHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(STATIC_DIR), **kwargs)
 
+    def log_message(self, format, *args):
+        try:
+            if len(args) > 0 and ("/api/status" in str(args[0]) or "/api/logs" in str(args[0])):
+                return
+        except Exception:
+            pass
+        super().log_message(format, *args)
+
     def _send_json(self, payload: dict, status: int = HTTPStatus.OK) -> None:
         body = json.dumps(payload).encode("utf-8")
         self.send_response(status)

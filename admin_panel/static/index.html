@@ -1,60 +1,72 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vanish Admin Panel</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
   <div class="bg-grid" aria-hidden="true"></div>
   <main class="layout">
+
     <header class="hero">
-      <p class="eyebrow">Project Vanish Lite</p>
-      <h1>Admin Control Panel</h1>
-      <p class="sub">Manage disposable sessions, apply modes, and monitor logs in one place.</p>
+      <span class="eyebrow">Project Vanish Lite</span>
+      <h1>Admin Command Center</h1>
+      <p class="sub">Deploy secure, disposable environments and monitor system processes.</p>
     </header>
 
     <section class="card controls">
-      <h2>Session Controls</h2>
+      <div class="card-head">
+        <h2>System Configuration</h2>
+      </div>
+
       <div class="form-grid">
         <div class="field">
-          <label for="mode-select">Start mode</label>
+          <label for="mode-select">Deployment Mode</label>
           <select id="mode-select">
-            <option value="dev">dev</option>
-            <option value="secure">secure</option>
-            <option value="privacy">privacy</option>
-            <option value="exam">exam</option>
-            <option value="online">online</option>
+            <option value="dev">Dev</option>
+            <option value="secure">Secure</option>
+            <option value="privacy">Privacy</option>
+            <option value="exam">Exam</option>
+            <option value="online">Online</option>
           </select>
         </div>
         <div class="field">
-          <label for="username-input">Username (optional)</label>
-          <input id="username-input" type="text" placeholder="leave empty for auto">
+          <label for="username-input">Username</label>
+          <input id="username-input" type="text" placeholder="Auto-generate">
         </div>
         <div class="field">
-          <label for="password-input">Password (optional)</label>
-          <input id="password-input" type="text" placeholder="leave empty for default">
+          <label for="password-input">Password</label>
+          <input id="password-input" type="password" placeholder="Default">
         </div>
         <div class="field">
-          <label for="proc-limit-input">Process Limit Override</label>
-          <input id="proc-limit-input" type="number" min="1" placeholder="optional">
+          <label for="proc-limit-input">Process Limit</label>
+          <input id="proc-limit-input" type="number" min="1" placeholder="Unlimited">
         </div>
       </div>
+
       <div class="controls-row">
-        <label class="switch sticky-pref"><input id="persist-until-shutdown" type="checkbox"><span>Persist Until System Shutdown (do not expire on logout)</span></label>
+        <label class="switch sticky-pref"><input id="persist-until-shutdown" type="checkbox"><span>Persist session until
+            system shutdown</span></label>
       </div>
+
       <div class="controls-row">
         <select id="preset-select">
-          <option value="">Select preset</option>
+          <option value="">Choose preset configuration...</option>
         </select>
-        <button id="load-preset-btn" class="btn ghost">Load Preset</button>
-        <button id="save-preset-btn" class="btn ghost">Save Current as Preset</button>
-        <button id="delete-preset-btn" class="btn danger">Delete Preset</button>
+        <button id="load-preset-btn" class="btn ghost">Load</button>
+        <button id="save-preset-btn" class="btn ghost">Save Config</button>
+        <button id="delete-preset-btn" class="btn danger mini">Delete</button>
       </div>
+
       <section id="mode-description" class="mode-description">
         <h3 id="mode-desc-title">Mode: dev</h3>
         <p id="mode-desc-summary">Default lightweight disposable session with minimal restrictions.</p>
@@ -63,104 +75,125 @@
 
       <div class="toggle-sections">
         <article class="toggle-card mode-card" data-mode="exam">
-          <h3>Exam Mode Options</h3>
-          <label class="switch"><input id="exam-restrict-network" type="checkbox" checked><span>Restrict network</span></label>
-          <label class="switch"><input id="exam-disable-usb" type="checkbox" checked><span>Disable USB</span></label>
-          <label class="switch"><input id="exam-enable-persistence" type="checkbox" checked><span>Enable submit persistence</span></label>
+          <h3>Exam Mode Integrity Options</h3>
+          <label class="switch"><input id="exam-restrict-network" type="checkbox" checked><span>Restrict external
+              network access</span></label>
+          <label class="switch"><input id="exam-disable-usb" type="checkbox" checked><span>Block external USB
+              storage</span></label>
+          <label class="switch"><input id="exam-enable-persistence" type="checkbox" checked><span>Preserve submission
+              directory</span></label>
         </article>
 
         <article class="toggle-card mode-card" data-mode="online">
-          <h3>Online Mode Options</h3>
-          <label class="switch"><input id="online-enable-network" type="checkbox" checked><span>Enable online network (HTTP/HTTPS/DNS)</span></label>
-          <label class="switch"><input id="online-enable-dns-filtering" type="checkbox" checked><span>Enable DNS host blocking</span></label>
-          <label class="switch"><input id="online-disable-usb" type="checkbox" checked><span>Disable USB</span></label>
-          <label class="switch"><input id="online-enable-persistence" type="checkbox" checked><span>Enable submit persistence</span></label>
-          <label class="switch"><input id="online-enable-command-restriction" type="checkbox"><span>Enable command restriction</span></label>
+          <h3>Online Mode Restrictions</h3>
+          <label class="switch"><input id="online-enable-network" type="checkbox" checked><span>Enable standard
+              networking (HTTP/HTTPS/DNS)</span></label>
+          <label class="switch"><input id="online-enable-dns-filtering" type="checkbox" checked><span>Activate
+              domain-level blocking</span></label>
+          <label class="switch"><input id="online-disable-usb" type="checkbox" checked><span>Block USB storage
+              devices</span></label>
+          <label class="switch"><input id="online-enable-persistence" type="checkbox" checked><span>Preserve submission
+              directory</span></label>
+          <label class="switch"><input id="online-enable-command-restriction" type="checkbox"><span>Enforce strict CLI
+              allowlist</span></label>
 
-          <div class="config-buttons">
-            <button type="button" class="btn ghost mini config-toggle-btn" data-target="online-allow-wrap">Edit Allowed Sites</button>
-            <button type="button" class="btn ghost mini config-toggle-btn" data-target="online-block-wrap">Edit Blocked Sites</button>
-            <button type="button" class="btn ghost mini config-toggle-btn" data-target="online-commands-wrap">Edit Blocked Commands</button>
+          <div class="controls-row" style="margin-top: 16px;">
+            <button type="button" class="btn ghost mini config-toggle-btn" data-target="online-allow-wrap">Allowlist
+              Domains</button>
+            <button type="button" class="btn ghost mini config-toggle-btn" data-target="online-block-wrap">Blocklist
+              Domains</button>
+            <button type="button" class="btn ghost mini config-toggle-btn" data-target="online-commands-wrap">Restricted
+              Commands</button>
           </div>
 
           <div id="online-allow-wrap" class="config-editor-wrap hidden">
-            <label class="stacked" for="online-allow-sites">Allowed Sites (comma/new line)</label>
-            <textarea id="online-allow-sites" class="code-editor-input" rows="8" placeholder="docs.python.org, cplusplus.com"></textarea>
+            <label for="online-allow-sites">Allowed Domains (CSV/Newline)</label>
+            <textarea id="online-allow-sites" class="code-editor-input"
+              placeholder="docs.python.org, cplusplus.com"></textarea>
           </div>
 
           <div id="online-block-wrap" class="config-editor-wrap hidden">
-            <label class="stacked" for="online-block-sites">Blocked Sites (comma/new line)</label>
-            <textarea id="online-block-sites" class="code-editor-input" rows="8" placeholder="chat.openai.com, github.com"></textarea>
+            <label for="online-block-sites">Blocked Domains (CSV/Newline)</label>
+            <textarea id="online-block-sites" class="code-editor-input"
+              placeholder="chat.openai.com, github.com"></textarea>
           </div>
 
           <div id="online-commands-wrap" class="config-editor-wrap hidden">
-            <label class="stacked" for="online-block-commands">Blocked Commands (comma/new line)</label>
-            <textarea id="online-block-commands" class="code-editor-input" rows="8" placeholder="curl, wget, git, python3"></textarea>
+            <label for="online-block-commands">Restricted System Binaries (CSV/Newline)</label>
+            <textarea id="online-block-commands" class="code-editor-input" placeholder="curl, wget, python3"></textarea>
           </div>
         </article>
 
         <article class="toggle-card mode-card" data-mode="privacy">
-          <h3>Privacy Mode Options</h3>
-          <label class="switch"><input id="privacy-enable-ram-home" type="checkbox" checked><span>Enable RAM home</span></label>
-          <label class="stacked" for="privacy-ram-size-mb">RAM Mount Size (MB)</label>
-          <input id="privacy-ram-size-mb" type="number" min="128" step="128" value="2048">
-          <label class="switch"><input id="privacy-enable-dns" type="checkbox" checked><span>Apply privacy DNS</span></label>
-          <label class="switch"><input id="privacy-block-telemetry" type="checkbox" checked><span>Block telemetry</span></label>
-          <label class="switch"><input id="privacy-apply-dark-theme" type="checkbox" checked><span>Apply dark theme</span></label>
+          <h3>Privacy Mode Hardening</h3>
+          <label class="switch"><input id="privacy-enable-ram-home" type="checkbox" checked><span>Mount ephemeral RAM
+              home (tmpfs)</span></label>
+          <div style="margin: 16px 0;">
+            <label for="privacy-ram-size-mb">TMPFS Allocation (MB)</label>
+            <input id="privacy-ram-size-mb" type="number" min="128" step="128" value="2048">
+          </div>
+          <label class="switch"><input id="privacy-enable-dns" type="checkbox" checked><span>Route through encrypted DNS
+              mapping</span></label>
+          <label class="switch"><input id="privacy-block-telemetry" type="checkbox" checked><span>Null-route known
+              telemetry sinks</span></label>
+          <label class="switch"><input id="privacy-apply-dark-theme" type="checkbox" checked><span>Enforce system dark
+              mode</span></label>
         </article>
       </div>
-      <p id="mode-hint" class="mode-hint">No extra options for this mode.</p>
+      <p id="mode-hint" class="mode-hint">No extra configuration necessary for this mode deployment.</p>
 
-      <div class="controls-row">
-        <button id="validate-btn" class="btn ghost">Validate Config</button>
-        <button id="dry-run-btn" class="btn ghost">Dry Run</button>
-        <button id="start-btn" class="btn primary">Start Session</button>
-        <button id="stop-btn" class="btn danger">Stop All</button>
+      <div class="controls-row"
+        style="margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border-subtle);">
+        <button id="validate-btn" class="btn ghost">Verify Matrix</button>
+        <button id="dry-run-btn" class="btn ghost">Dry Run Deploy</button>
+        <button id="start-btn" class="btn primary">Launch Instance</button>
+        <button id="stop-btn" class="btn danger" style="margin-left: auto;">Terminate All Operations</button>
       </div>
-      <p id="action-status" class="status-line">Ready.</p>
+      <div id="action-status" class="status-line">System standing by for instructions.</div>
     </section>
 
-    <section class="grid">
-      <article class="card">
+    <div class="dashboard-grid">
+      <section class="card">
         <div class="card-head">
-          <h2>Active Sessions</h2>
-          <button id="refresh-btn" class="btn ghost">Refresh</button>
+          <h2 style="margin: 0;">Instance Telemetry</h2>
+          <button id="refresh-btn" class="btn ghost mini">Force Sync</button>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>User</th>
-                <th>Mode</th>
-                <th>Running</th>
-                <th>Time Left</th>
-                <th>Persist</th>
-                <th>Actions</th>
+                <th>User Identity</th>
+                <th>Enclave Mode</th>
+                <th>Status</th>
+                <th>TTL</th>
+                <th>Persistence</th>
+                <th>Override</th>
               </tr>
             </thead>
             <tbody id="sessions-body"></tbody>
           </table>
         </div>
-      </article>
+      </section>
 
-      <article class="card logs-card">
+      <section class="card logs-card">
         <div class="card-head">
-          <h2>Live Logs</h2>
-          <span class="pill" id="session-count">0 sessions</span>
+          <h2 style="margin: 0;">Event Stream</h2>
+          <span class="pill" id="session-count">0 Active Instances</span>
         </div>
         <pre id="logs-box" class="logs"></pre>
-      </article>
-    </section>
+      </section>
+    </div>
 
     <section id="config-viewer" class="card config-viewer hidden">
       <div class="card-head">
-        <h2 id="config-title">Session Config Snapshot</h2>
-        <button id="close-config-btn" class="btn ghost mini">Close</button>
+        <h2 id="config-title">Deployment Manifest Snapshot</h2>
+        <button id="close-config-btn" class="btn ghost mini">Dismiss</button>
       </div>
-      <pre id="config-box" class="logs"></pre>
+      <pre id="config-box" class="logs" style="min-height: auto; max-height: 400px;"></pre>
     </section>
   </main>
 
   <script src="app.js"></script>
 </body>
+
 </html>
