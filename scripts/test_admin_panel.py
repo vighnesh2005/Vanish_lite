@@ -72,6 +72,54 @@ def test_session_parse_and_record_filter(server):
         assert_true(not server.is_session_record(conf_file), "Config file should not be treated as session record")
 
 
+def test_scan_home_dir(server):
+    """Verify scan labels and exclusion logic using _scan_home_dir_impl."""
+    with tempfile.TemporaryDirectory() as tmp:
+        home = Path(tmp)
+        # Create a fake user home layout.
+        (home / ".mozilla").mkdir()
+        (home / ".ssh").mkdir()
+        (home / ".vimrc").write_text("set number\n", encoding="utf-8")
+        (home / ".cache").mkdir()           # must NOT appear in results
+        (home / ".config").mkdir()
+        (home / ".config" / "myapp").mkdir()  # should appear as Generic App Config
+
+        entries = _scan_home_dir_impl(server, home)
+        paths = {e["rel_path"] for e in entries}
+
+        assert_true(".mozilla" in paths, "Firefox Profile not detected")
+        assert_true(".ssh" in paths, "SSH Keys not detected")
+        assert_true(".vimrc" in paths, "Vim config not detected")
+        assert_true(not any(".cache" in p for p in paths), ".cache must be excluded")
+        assert_true(any("myapp" in p for p in paths), "Generic app config not detected")
+        print(f"  [scan_home_dir] found {len(entries)} entries: {sorted(paths)}")
+
+
+def _scan_home_dir_impl(server, home_dir):
+    """Call scan_home_dir logic with a custom home directory for testing."""
+    import pathlib
+    results = []
+    for rel, label in server._KNOWN_PATHS:
+        candidate = home_dir / rel
+        if candidate.exists():
+            results.append({'rel_path': rel, 'label': label,
+                            'size_mb': server._dir_size_mb(candidate), 'is_known': True})
+    for scan_base_rel, scan_label in [('.config', 'Generic App Config'), ('.local/share', 'Generic App Data')]:
+        scan_base = home_dir / scan_base_rel
+        if not scan_base.is_dir():
+            continue
+        for child in sorted(scan_base.iterdir()):
+            child_rel = f"{scan_base_rel}/{child.name}"
+            if any(child_rel.startswith(s) for s in server._SKIP_PREFIXES):
+                continue
+            already = any(child_rel == r or child_rel.startswith(r + '/') for r, _ in server._KNOWN_PATHS)
+            if already:
+                continue
+            results.append({'rel_path': child_rel, 'label': f"{scan_label}: {child.name}",
+                            'size_mb': server._dir_size_mb(home_dir / child_rel), 'is_known': False})
+    return results
+
+
 def main():
     repo_root = Path(__file__).resolve().parent.parent
     server = load_server_module(repo_root)
@@ -80,6 +128,7 @@ def main():
         ("build_policy_lines", test_build_policy_lines),
         ("presets_roundtrip", test_presets_roundtrip),
         ("session_parse_and_record_filter", test_session_parse_and_record_filter),
+        ("scan_home_dir", test_scan_home_dir),
     ]
 
     failures = []

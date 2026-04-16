@@ -262,7 +262,8 @@ async function getJSON(url, options = {}) {
   }
 
   if (!res.ok || !data.ok) {
-    const message = data.error || data.stderr || data.stdout || `Request failed: ${res.status}`;
+    const message = data.error || data.message || data.stderr || data.stdout || `Request failed: ${res.status}`;
+    console.error(`[API Error] ${url}: ${message}`, data);
     throw new Error(message);
   }
   return data;
@@ -537,3 +538,569 @@ sessionsBody.addEventListener('click', async (event) => {
   setInterval(refreshStatus, 5000);
   setInterval(refreshLogs, 5000);
 })();
+
+// ===========================================================================
+// Cloud Sync — auth-aware version
+// ===========================================================================
+
+// ── Token storage (survives page refresh within the tab) ──────────────────
+const CLOUD_TOKEN_KEY = 'vanish_cloud_token';
+const CLOUD_USER_KEY = 'vanish_cloud_user';
+
+function cloudGetToken() { return sessionStorage.getItem(CLOUD_TOKEN_KEY) || ''; }
+function cloudGetUser() { return sessionStorage.getItem(CLOUD_USER_KEY) || ''; }
+function cloudSaveSession(token, username) {
+  sessionStorage.setItem(CLOUD_TOKEN_KEY, token);
+  sessionStorage.setItem(CLOUD_USER_KEY, username);
+}
+function cloudClearSession() {
+  sessionStorage.removeItem(CLOUD_TOKEN_KEY);
+  sessionStorage.removeItem(CLOUD_USER_KEY);
+}
+
+// ── DOM references ────────────────────────────────────────────────────────
+const cloudAuthPanel = document.getElementById('cloud-auth-panel');
+const cloudUserBanner = document.getElementById('cloud-user-banner');
+const cloudSyncPanels = document.getElementById('cloud-sync-panels');
+const cloudUsernameDisplay = document.getElementById('cloud-username-display');
+const cloudAuthUser = document.getElementById('cloud-auth-user');
+const cloudAuthPass = document.getElementById('cloud-auth-pass');
+const cloudAuthStatus = document.getElementById('cloud-auth-status');
+const cloudLoginBtn = document.getElementById('cloud-login-btn');
+const cloudRegisterBtn = document.getElementById('cloud-register-btn');
+const cloudLogoutBtn = document.getElementById('cloud-logout-btn');
+const cloudScanBtn = document.getElementById('cloud-scan-btn');
+const cloudUploadBtn = document.getElementById('cloud-upload-btn');
+const cloudListBtn = document.getElementById('cloud-list-btn');
+const cloudRestoreBtn = document.getElementById('cloud-restore-btn');
+const cloudSelectAll = document.getElementById('cloud-select-all-btn');
+const cloudDeselectAll = document.getElementById('cloud-deselect-all-btn');
+const cloudScanUser = document.getElementById('cloud-scan-user');
+const cloudConfigName = document.getElementById('cloud-config-name');
+const cloudScanResults = document.getElementById('cloud-scan-results');
+const cloudEntriesList = document.getElementById('cloud-entries-list');
+const cloudConfigsWrap = document.getElementById('cloud-configs-table-wrap');
+const cloudConfigsBody = document.getElementById('cloud-configs-body');
+const cloudRestoreId = document.getElementById('cloud-restore-id');
+const cloudRestoreUser = document.getElementById('cloud-restore-user');
+const cloudStatusBox = document.getElementById('cloud-status-box');
+const cloudAtlasStatus = document.getElementById('cloud-atlas-status');
+const cloudUploadOverlay = document.getElementById('cloud-upload-overlay');
+const cloudUploadTitle = document.getElementById('cloud-upload-title');
+const cloudUploadStage = document.getElementById('cloud-upload-stage');
+const cloudUploadMeta = document.getElementById('cloud-upload-meta');
+const cloudUploadProgressFill = document.getElementById('cloud-upload-progress-fill');
+const cloudUploadProgressText = document.getElementById('cloud-upload-progress-text');
+const cloudUploadEta = document.getElementById('cloud-upload-eta');
+const cloudUploadElapsed = document.getElementById('cloud-upload-elapsed');
+
+const CLOUD_UPLOAD_IDLE_LABEL = 'Upload Selected to Cloud';
+const CLOUD_UPLOAD_BUSY_LABEL = 'Uploading…';
+
+let cloudUploadOverlayTimer = null;
+let cloudUploadOverlayStartedAt = 0;
+let cloudUploadOverlayProgress = 0;
+let cloudBusy = false;
+let cloudUploadEnabledBySelection = false;
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function cloudLog(msg, isError = false) {
+  const ts = new Date().toLocaleTimeString();
+  cloudStatusBox.textContent = `[${ts}] ${msg}`;
+  cloudStatusBox.style.color = isError ? '#e05c5c' : '';
+  if (isError) {
+    console.error(`[Cloud] ${msg}`);
+  }
+}
+
+function cloudAuthLog(msg, isError = false) {
+  cloudAuthStatus.textContent = msg;
+  cloudAuthStatus.style.color = isError ? '#e05c5c' : '';
+  if (isError) {
+    console.error(`[Cloud Auth] ${msg}`);
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function fmtDuration(totalSeconds) {
+  const secs = Math.max(0, Math.floor(totalSeconds || 0));
+  const mm = String(Math.floor(secs / 60)).padStart(2, '0');
+  const ss = String(secs % 60).padStart(2, '0');
+  return `${mm}:${ss}`;
+}
+
+function fmtSizeShort(sizeMb) {
+  const num = Number(sizeMb);
+  if (!Number.isFinite(num) || num <= 0) return '0 MB';
+  if (num >= 1024) return `${(num / 1024).toFixed(2)} GB`;
+  return `${num.toFixed(2)} MB`;
+}
+
+function syncCloudUploadButtonState() {
+  cloudUploadBtn.disabled = cloudBusy || !cloudUploadEnabledBySelection;
+  cloudUploadBtn.textContent = cloudBusy ? CLOUD_UPLOAD_BUSY_LABEL : CLOUD_UPLOAD_IDLE_LABEL;
+}
+
+function refreshCloudSelectionState() {
+  const checks = [...document.querySelectorAll('.cloud-entry-check')];
+  const checkedCount = checks.filter(cb => cb.checked).length;
+  cloudUploadEnabledBySelection = checks.length > 0 && checkedCount > 0;
+  syncCloudUploadButtonState();
+}
+
+function cloudSetBusy(busy) {
+  cloudBusy = Boolean(busy);
+  syncCloudUploadButtonState();
+  cloudScanBtn.disabled = busy;
+  cloudListBtn.disabled = busy;
+  cloudRestoreBtn.disabled = busy;
+}
+
+function showCloudUploadOverlay(title = 'Uploading Config to Cloud', details = {}) {
+  const pathsCount = Number(details.pathsCount) || 0;
+  const selectedSizeMb = Number(details.selectedSizeMb) || 0;
+  const pathLabel = pathsCount === 1 ? '1 path' : `${pathsCount} paths`;
+  cloudUploadTitle.textContent = title;
+  cloudUploadStage.textContent = 'Preparing upload…';
+  cloudUploadMeta.textContent = `Selected: ${pathLabel} • Approx size: ${fmtSizeShort(selectedSizeMb)}`;
+  cloudUploadProgressFill.style.width = '0%';
+  cloudUploadProgressText.textContent = '0%';
+  cloudUploadEta.textContent = 'ETA: calculating…';
+  cloudUploadElapsed.textContent = 'Elapsed: 00:00';
+  cloudUploadOverlayProgress = 0;
+  cloudUploadOverlayStartedAt = Date.now();
+  if (cloudUploadOverlayTimer) {
+    clearInterval(cloudUploadOverlayTimer);
+  }
+  cloudUploadOverlayTimer = setInterval(() => {
+    if (!cloudUploadOverlayStartedAt) return;
+    const elapsed = Math.floor((Date.now() - cloudUploadOverlayStartedAt) / 1000);
+    cloudUploadElapsed.textContent = `Elapsed: ${fmtDuration(elapsed)}`;
+    if (cloudUploadOverlayProgress > 0 && cloudUploadOverlayProgress < 100) {
+      const etaSec = Math.ceil((elapsed * (100 - cloudUploadOverlayProgress)) / cloudUploadOverlayProgress);
+      cloudUploadEta.textContent = `ETA: ${fmtDuration(etaSec)}`;
+    }
+  }, 1000);
+  cloudUploadOverlay.classList.remove('hidden');
+}
+
+function updateCloudUploadOverlay(progress, stage) {
+  const bounded = Math.max(0, Math.min(100, Number(progress) || 0));
+  cloudUploadOverlayProgress = bounded;
+  cloudUploadProgressFill.style.width = `${bounded}%`;
+  cloudUploadProgressText.textContent = `${Math.round(bounded)}%`;
+  if (stage) cloudUploadStage.textContent = stage;
+  if (bounded >= 100) cloudUploadEta.textContent = 'ETA: complete';
+}
+
+function hideCloudUploadOverlay() {
+  if (cloudUploadOverlayTimer) {
+    clearInterval(cloudUploadOverlayTimer);
+    cloudUploadOverlayTimer = null;
+  }
+  cloudUploadOverlayStartedAt = 0;
+  cloudUploadOverlay.classList.add('hidden');
+}
+
+function fmtTs(unix) {
+  if (!unix) return '—';
+  return new Date(unix * 1000).toLocaleString();
+}
+
+/** Returns fetch options with the cloud auth token header already set. */
+function cloudFetchOpts(extra = {}) {
+  const token = cloudGetToken();
+  return {
+    ...extra,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Cloud-Token': token,
+      ...(extra.headers || {}),
+    },
+  };
+}
+
+// ── UI state: show/hide panels based on login status ─────────────────────
+function applyCloudLoginState(loggedIn, username = '') {
+  if (loggedIn) {
+    cloudAuthPanel.classList.add('hidden');
+    cloudUserBanner.classList.remove('hidden');
+    cloudSyncPanels.classList.remove('hidden');
+    cloudUsernameDisplay.textContent = username;
+    listCloudConfigs();    // auto-load user's configs on login
+  } else {
+    cloudAuthPanel.classList.remove('hidden');
+    cloudUserBanner.classList.add('hidden');
+    cloudSyncPanels.classList.add('hidden');
+    cloudUsernameDisplay.textContent = '';
+  }
+}
+
+// ── Atlas status pill ─────────────────────────────────────────────────────
+async function checkAtlasStatus() {
+  try {
+    const data = await getJSON('/api/health');
+    const storageReady = (
+      data.supabase_configured !== undefined
+        ? Boolean(data.supabase_configured)
+        : ((data.cloudinary_configured === undefined) ? true : Boolean(data.cloudinary_configured))
+    );
+    if (data.atlas_configured && storageReady) {
+      cloudAtlasStatus.textContent = '✓ Atlas Connected';
+      cloudAtlasStatus.style.background = 'rgba(80,200,120,0.15)';
+      cloudAtlasStatus.style.color = '#50c878';
+      cloudAtlasStatus.title = 'MongoDB Atlas + Supabase Storage reachable/configured';
+    } else {
+      cloudAtlasStatus.textContent = '✗ Atlas Not Connected';
+      cloudAtlasStatus.style.background = 'rgba(224,92,92,0.15)';
+      cloudAtlasStatus.style.color = '#e05c5c';
+      const reason = data.atlas_error || data.supabase_error || data.cloudinary_error || 'Atlas/Cloud storage is not configured or unreachable.';
+      cloudAtlasStatus.title = reason;
+      console.error(`[Atlas] ${reason}`);
+    }
+  } catch (_) {
+    cloudAtlasStatus.textContent = '? Unknown';
+    cloudAtlasStatus.title = 'Failed to load Atlas health status';
+    console.error('[Atlas] Failed to load Atlas health status.');
+  }
+}
+
+// Restore login state if a token is stored from earlier in this tab session.
+async function restoreCloudSession() {
+  const token = cloudGetToken();
+  if (!token) { applyCloudLoginState(false); return; }
+  try {
+    const data = await getJSON('/api/cloud/me', cloudFetchOpts());
+    if (data.logged_in) {
+      cloudSaveSession(token, data.username);
+      applyCloudLoginState(true, data.username);
+    } else {
+      cloudClearSession();
+      applyCloudLoginState(false);
+    }
+  } catch (_) {
+    applyCloudLoginState(false);
+  }
+}
+
+// ── Auth actions ──────────────────────────────────────────────────────────
+async function cloudRegister() {
+  const username = cloudAuthUser.value.trim();
+  const password = cloudAuthPass.value;
+  if (!username || !password) { cloudAuthLog('Enter username and password.', true); return; }
+
+  cloudAuthLog('Creating account…');
+  try {
+    const data = await getJSON('/api/cloud/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    cloudAuthLog(`✓ ${data.message}. You can now log in.`);
+  } catch (err) {
+    cloudAuthLog(`Registration failed: ${err.message}`, true);
+  }
+}
+
+async function cloudLogin() {
+  const username = cloudAuthUser.value.trim();
+  const password = cloudAuthPass.value;
+  if (!username || !password) { cloudAuthLog('Enter username and password.', true); return; }
+
+  cloudAuthLog('Logging in…');
+  try {
+    const data = await getJSON('/api/cloud/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    cloudSaveSession(data.token, data.username);
+    applyCloudLoginState(true, data.username);
+    cloudAuthLog(`✓ ${data.message}`);
+    cloudAuthPass.value = '';
+  } catch (err) {
+    cloudAuthLog(`Login failed: ${err.message}`, true);
+  }
+}
+
+async function cloudLogout() {
+  const token = cloudGetToken();
+  try {
+    await getJSON('/api/cloud/logout', cloudFetchOpts({ method: 'POST' }));
+  } catch (_) { /* ignore */ }
+  cloudClearSession();
+  applyCloudLoginState(false);
+  cloudAuthLog('Logged out.');
+}
+
+// ── Cloud Sync actions ────────────────────────────────────────────────────
+async function scanUserForCloud() {
+  const username = cloudScanUser.value.trim();
+  if (!username) { cloudLog('Enter a session username to scan.', true); return; }
+
+  cloudLog(`Scanning /home/${username}…`);
+  cloudUploadEnabledBySelection = false;
+  syncCloudUploadButtonState();
+  cloudScanResults.classList.add('hidden');
+
+  try {
+    const data = await getJSON(
+      `/api/cloud/scan?username=${encodeURIComponent(username)}`,
+      cloudFetchOpts(),
+    );
+    renderCloudScanResults(data.entries || []);
+    cloudLog(`Found ${data.entries.length} path(s) in /home/${username}.`);
+  } catch (err) {
+    cloudLog(`Scan failed: ${err.message}`, true);
+  }
+}
+
+function renderCloudScanResults(entries) {
+  if (!entries.length) {
+    cloudEntriesList.innerHTML = '<p style="opacity:.6;font-size:.85em;">No data found in this user\'s home directory.</p>';
+    cloudScanResults.classList.remove('hidden');
+    cloudUploadEnabledBySelection = false;
+    syncCloudUploadButtonState();
+    return;
+  }
+  cloudEntriesList.innerHTML = entries.map((e, i) => `
+    <label class="cloud-entry">
+      <input type="checkbox" class="cloud-entry-check" data-rel="${e.rel_path}" data-idx="${i}" data-size-mb="${Number(e.size_mb) || 0}" checked>
+      <span class="cloud-entry-label">${e.label}</span>
+      <span class="cloud-badge ${e.is_known ? 'known' : 'generic'}">${e.is_known ? 'Known' : 'Generic'}</span>
+      <span class="cloud-entry-path">${e.rel_path}</span>
+      <span class="cloud-entry-size">${e.size_mb} MB</span>
+    </label>`).join('');
+  cloudScanResults.classList.remove('hidden');
+  document.querySelectorAll('.cloud-entry-check').forEach((cb) => {
+    cb.addEventListener('change', refreshCloudSelectionState);
+  });
+  refreshCloudSelectionState();
+}
+
+async function uploadSelectedPaths() {
+  const username = cloudScanUser.value.trim();
+  const configName = cloudConfigName.value.trim() || `${username}-backup`;
+  const checked = [...document.querySelectorAll('.cloud-entry-check:checked')];
+  const paths = checked.map(cb => cb.dataset.rel);
+  const selectedSizeMb = checked.reduce((sum, cb) => sum + (Number(cb.dataset.sizeMb) || 0), 0);
+  const token = cloudGetToken();
+
+  if (!paths.length) { cloudLog('Select at least one path to upload.', true); return; }
+
+  cloudLog(`Preparing upload for ${paths.length} path(s) (about ${fmtSizeShort(selectedSizeMb)})…`);
+  showCloudUploadOverlay('Uploading Config to Cloud', {
+    pathsCount: paths.length,
+    selectedSizeMb,
+  });
+  updateCloudUploadOverlay(2, 'Starting upload job…');
+  cloudSetBusy(true);
+
+  try {
+    let start;
+    try {
+      start = await getJSON('/api/cloud/upload/start', cloudFetchOpts({
+        method: 'POST',
+        body: JSON.stringify({ username, paths, config_name: configName, token }),
+      }));
+    } catch (startErr) {
+      // Backward-compatible fallback for older backend instances.
+      if ((startErr.message || '').toLowerCase().includes('not found')) {
+        cloudLog('Async upload endpoint unavailable; falling back to direct upload mode.');
+        updateCloudUploadOverlay(40, 'Uploading directly (fallback mode)…');
+        const direct = await getJSON('/api/cloud/upload', cloudFetchOpts({
+          method: 'POST',
+          body: JSON.stringify({ username, paths, config_name: configName, token }),
+        }));
+        updateCloudUploadOverlay(100, 'Upload complete.');
+        cloudLog(`✓ Upload complete. Config ID: ${direct.config_id}  (${direct.message || 'Saved to cloud.'})`);
+        cloudRestoreId.value = direct.config_id || '';
+        await listCloudConfigs();
+        return;
+      }
+      throw startErr;
+    }
+    const jobId = start.job_id;
+    if (!jobId) {
+      throw new Error('Upload job started but no job_id was returned.');
+    }
+
+    cloudLog(`Upload job ${jobId.slice(0, 8)}… started.`);
+
+    const maxPolls = 1200; // up to ~40 minutes
+    let finalData = null;
+    for (let i = 0; i < maxPolls; i += 1) {
+      const status = await getJSON(
+        `/api/cloud/upload/status?job_id=${encodeURIComponent(jobId)}`,
+        cloudFetchOpts(),
+      );
+      updateCloudUploadOverlay(status.progress, status.stage || 'Uploading…');
+
+      if (status.status === 'completed') {
+        finalData = status;
+        break;
+      }
+      if (status.status === 'failed') {
+        throw new Error(status.error || 'Upload failed.');
+      }
+      await sleep(2000);
+    }
+
+    if (!finalData) {
+      throw new Error('Upload timed out while waiting for completion. Please check cloud status and retry.');
+    }
+
+    updateCloudUploadOverlay(100, finalData.stage || 'Upload complete.');
+    cloudLog(`✓ Upload complete. Config ID: ${finalData.config_id}  (${finalData.message || 'Saved to Atlas.'})`);
+    cloudRestoreId.value = finalData.config_id || '';
+    await listCloudConfigs();
+  } catch (err) {
+    updateCloudUploadOverlay(100, `Upload failed: ${err.message}`);
+    cloudLog(`Upload failed: ${err.message}`, true);
+    await sleep(1600);
+  } finally {
+    hideCloudUploadOverlay();
+    cloudSetBusy(false);
+  }
+}
+
+async function listCloudConfigs() {
+  cloudLog('Fetching your saved configs from Atlas…');
+  try {
+    const data = await getJSON('/api/cloud/list', cloudFetchOpts());
+    renderCloudConfigs(data.configs || []);
+    if (!data.configs || data.configs.length === 0) {
+      cloudLog(`${data.message || '0 configs found.'} If you just uploaded, refresh once after 2-3 seconds.`, true);
+    } else {
+      cloudLog(data.message || 'Config list refreshed.');
+    }
+  } catch (err) {
+    cloudLog(`List failed: ${err.message}`, true);
+  }
+}
+
+function renderCloudConfigs(configs) {
+  cloudConfigsWrap.classList.remove('hidden');
+  if (!configs.length) {
+    cloudConfigsBody.innerHTML = '<tr><td colspan="5" style="opacity:.6;">No configs stored yet. Upload one above.</td></tr>';
+    return;
+  }
+  cloudConfigsBody.innerHTML = configs.map(c => `
+    <tr>
+      <td>${c.config_name}</td>
+      <td>${c.username || '—'}</td>
+      <td>${c.total_size_mb}</td>
+      <td>${fmtTs(c.timestamp)}</td>
+      <td>
+        <span class="cloud-id-chip" title="${c.config_id}">${c.config_id.slice(0, 8)}…</span>
+        <button class="btn ghost mini" onclick="copyToClipboard('${c.config_id}')">Copy</button>
+        <button class="btn ghost mini" onclick="prefillRestore('${c.config_id}')">Use</button>
+        <button class="btn danger mini" onclick="deleteCloudConfig('${c.config_id}')">Delete</button>
+      </td>
+    </tr>`).join('');
+}
+
+function prefillRestore(configId) {
+  cloudRestoreId.value = configId;
+  cloudRestoreUser.focus();
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => cloudLog(`Copied ${text} to clipboard.`));
+}
+
+async function deleteCloudConfig(config_id) {
+  const token = cloudGetToken();
+  const cfgId = String(config_id || '').trim();
+  if (!cfgId) {
+    cloudLog('Cannot delete: missing config ID.', true);
+    return;
+  }
+  if (!window.confirm(`Delete config "${cfgId}" from Supabase Storage + MongoDB Atlas? This cannot be undone.`)) return;
+
+  cloudLog(`Deleting config ${cfgId.slice(0, 8)}… from cloud storage…`);
+  cloudSetBusy(true);
+  try {
+    const data = await getJSON('/api/cloud/delete', cloudFetchOpts({
+      method: 'POST',
+      body: JSON.stringify({ config_id: cfgId, token }),
+    }));
+    cloudLog(`✓ ${data.message || `Deleted ${cfgId}.`}`);
+    if (cloudRestoreId.value.trim() === cfgId) {
+      cloudRestoreId.value = '';
+    }
+    await listCloudConfigs();
+  } catch (err) {
+    cloudLog(`Delete failed: ${err.message}`, true);
+  } finally {
+    cloudSetBusy(false);
+  }
+}
+
+async function restoreCloudConfig() {
+  const config_id = cloudRestoreId.value.trim();
+  const target_username = cloudRestoreUser.value.trim();
+  const token = cloudGetToken();
+
+  if (!config_id || !target_username) {
+    cloudLog('Enter both a Config ID and Target Username.', true);
+    return;
+  }
+  if (!window.confirm(`Restore config "${config_id}" into /home/${target_username}? Existing files may be overwritten.`)) return;
+
+  cloudLog(`Downloading and restoring into /home/${target_username}…`);
+  cloudRestoreBtn.disabled = true;
+
+  try {
+    const data = await getJSON('/api/cloud/restore', cloudFetchOpts({
+      method: 'POST',
+      body: JSON.stringify({ config_id, target_username, token }),
+    }));
+    cloudLog(`✓ ${data.message}`);
+  } catch (err) {
+    cloudLog(`Restore failed: ${err.message}`, true);
+  } finally {
+    cloudRestoreBtn.disabled = false;
+  }
+}
+
+// ── Event listeners ───────────────────────────────────────────────────────
+cloudLoginBtn.addEventListener('click', cloudLogin);
+cloudRegisterBtn.addEventListener('click', cloudRegister);
+cloudLogoutBtn.addEventListener('click', cloudLogout);
+
+// Allow Enter key in auth fields to trigger login.
+[cloudAuthUser, cloudAuthPass].forEach(el =>
+  el.addEventListener('keydown', e => { if (e.key === 'Enter') cloudLogin(); })
+);
+
+cloudScanBtn.addEventListener('click', scanUserForCloud);
+cloudUploadBtn.addEventListener('click', uploadSelectedPaths);
+cloudListBtn.addEventListener('click', listCloudConfigs);
+cloudRestoreBtn.addEventListener('click', restoreCloudConfig);
+cloudSelectAll.addEventListener('click', () =>
+  document.querySelectorAll('.cloud-entry-check').forEach(cb => { cb.checked = true; })
+);
+cloudDeselectAll.addEventListener('click', () =>
+  document.querySelectorAll('.cloud-entry-check').forEach(cb => { cb.checked = false; })
+);
+cloudSelectAll.addEventListener('click', refreshCloudSelectionState);
+cloudDeselectAll.addEventListener('click', refreshCloudSelectionState);
+
+// Convenience: clicking Config in the sessions table pre-fills the scan user field.
+sessionsBody.addEventListener('click', (event) => {
+  const target = event.target;
+  if (target instanceof HTMLElement && target.dataset.action === 'view-config') {
+    cloudScanUser.value = target.dataset.user || '';
+  }
+});
+
+// ── Initialise ────────────────────────────────────────────────────────────
+checkAtlasStatus();
+restoreCloudSession();    // restore login state if token still valid
+syncCloudUploadButtonState();

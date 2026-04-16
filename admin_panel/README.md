@@ -49,6 +49,10 @@ sudo scripts/test_modes_integration.sh
 ## Notes
 - Run with `sudo` so the panel can execute the `vanish` binary and access system session/log files.
 - If session creation fails, check the status line on the panel first; it now shows backend/root errors directly.
+- Cloud backups now store archive files in Supabase Storage and metadata/auth in MongoDB Atlas.
+- Set `VANISH_SUPABASE_URL`, `VANISH_SUPABASE_SERVICE_ROLE_KEY`, and `VANISH_SUPABASE_BUCKET` before starting the panel.
+- Large cloud uploads are automatically chunked and merged during restore (`VANISH_STORAGE_CHUNK_MB`, default `20`), with automatic chunk downshift retries if the storage provider returns a size-limit error.
+- Config deletion from the UI removes both the Atlas metadata record and the corresponding Supabase storage file(s).
 - Host/port can be customized:
 
 ```bash

@@ -191,6 +191,136 @@
       </div>
       <pre id="config-box" class="logs" style="min-height: auto; max-height: 400px;"></pre>
     </section>
+
+    <!-- ============================================================
+         Cloud Sync Card
+         ============================================================ -->
+    <section class="card cloud-sync-card" id="cloud-sync-card">
+      <div class="card-head">
+        <h2 style="margin:0;">☁ Cloud Config Sync</h2>
+        <span id="cloud-atlas-status" class="pill">Checking Atlas…</span>
+      </div>
+
+      <!-- ── Auth Panel (visible when logged out) ── -->
+      <div id="cloud-auth-panel" class="cloud-panel">
+        <h3 class="cloud-panel-title">Account Access</h3>
+        <p class="cloud-sync-description">Create an account or log in — all your backups are stored under your account.
+        </p>
+        <div class="form-grid" style="margin-bottom:16px;">
+          <div class="field">
+            <label for="cloud-auth-user">Username</label>
+            <input id="cloud-auth-user" type="text" placeholder="e.g. alice" autocomplete="username">
+          </div>
+          <div class="field">
+            <label for="cloud-auth-pass">Password</label>
+            <input id="cloud-auth-pass" type="password" placeholder="Min. 6 characters" autocomplete="current-password">
+          </div>
+        </div>
+        <div class="controls-row">
+          <button id="cloud-login-btn" class="btn primary">Log In</button>
+          <button id="cloud-register-btn" class="btn ghost">Create Account</button>
+        </div>
+        <pre id="cloud-auth-status" class="logs cloud-status"
+          style="min-height:36px;max-height:60px;margin-top:12px;">Enter your credentials above.</pre>
+      </div>
+
+      <!-- ── Logged-in banner (visible when logged in) ── -->
+      <div id="cloud-user-banner" class="cloud-user-banner hidden">
+        <span>Logged in as <strong id="cloud-username-display"></strong></span>
+        <button id="cloud-logout-btn" class="btn ghost mini">Log Out</button>
+      </div>
+
+      <!-- ── Sync Panels (hidden until logged in) ── -->
+      <div id="cloud-sync-panels" class="hidden" style="margin-top:20px;">
+
+        <!-- Export -->
+        <div class="cloud-panel">
+          <h3 class="cloud-panel-title">Export Session to Cloud</h3>
+          <div class="form-grid" style="margin-bottom:16px;">
+            <div class="field">
+              <label for="cloud-scan-user">Session Username</label>
+              <input id="cloud-scan-user" type="text" placeholder="e.g. vanish_abc123">
+            </div>
+            <div class="field">
+              <label for="cloud-config-name">Config Name</label>
+              <input id="cloud-config-name" type="text" placeholder="e.g. my-dev-setup">
+            </div>
+          </div>
+          <div class="controls-row" style="margin-bottom:16px;">
+            <button id="cloud-scan-btn" class="btn ghost">Scan Home Dir</button>
+            <button id="cloud-upload-btn" class="btn primary" disabled>Upload Selected to Cloud</button>
+          </div>
+          <div id="cloud-scan-results" class="cloud-checklist hidden">
+            <p class="cloud-checklist-hint">Select paths to include in the backup:</p>
+            <div id="cloud-entries-list"></div>
+            <div class="controls-row" style="margin-top:8px;">
+              <button id="cloud-select-all-btn" class="btn ghost mini">Select All</button>
+              <button id="cloud-deselect-all-btn" class="btn ghost mini">Deselect All</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Saved configs -->
+        <div class="cloud-panel" style="margin-top:20px;">
+          <h3 class="cloud-panel-title">My Cloud Configs</h3>
+          <div class="controls-row" style="margin-bottom:12px;">
+            <button id="cloud-list-btn" class="btn ghost">Refresh Config List</button>
+          </div>
+          <div id="cloud-configs-table-wrap" class="table-wrap hidden">
+            <table>
+              <thead>
+                <tr>
+                  <th>Config Name</th>
+                  <th>Session User</th>
+                  <th>Size (MB)</th>
+                  <th>Date</th>
+                  <th>Config ID</th>
+                </tr>
+              </thead>
+              <tbody id="cloud-configs-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Restore -->
+        <div class="cloud-panel" style="margin-top:20px;">
+          <h3 class="cloud-panel-title">Restore into Session</h3>
+          <div class="form-grid" style="margin-bottom:16px;">
+            <div class="field">
+              <label for="cloud-restore-id">Config ID</label>
+              <input id="cloud-restore-id" type="text" placeholder="Paste ObjectID or click Use">
+            </div>
+            <div class="field">
+              <label for="cloud-restore-user">Target Session Username</label>
+              <input id="cloud-restore-user" type="text" placeholder="e.g. vanish_xyz789">
+            </div>
+          </div>
+          <div class="controls-row">
+            <button id="cloud-restore-btn" class="btn primary">Restore to Session</button>
+          </div>
+        </div>
+
+        <pre id="cloud-status-box" class="logs cloud-status"
+          style="margin-top:20px;min-height:60px;max-height:200px;">Ready.</pre>
+      </div>
+    </section>
+
+    <div id="cloud-upload-overlay" class="cloud-upload-overlay hidden" role="dialog" aria-live="polite"
+      aria-busy="true" aria-modal="true">
+      <div class="cloud-upload-modal">
+        <h3 id="cloud-upload-title">Uploading Config to Cloud</h3>
+        <p id="cloud-upload-stage">Preparing upload…</p>
+        <div id="cloud-upload-meta" class="cloud-upload-meta">Preparing selected files…</div>
+        <div class="cloud-upload-progress-wrap" aria-hidden="true">
+          <div id="cloud-upload-progress-fill" class="cloud-upload-progress-fill"></div>
+        </div>
+        <div class="cloud-upload-progress-line">
+          <div id="cloud-upload-progress-text" class="cloud-upload-progress-text">0%</div>
+          <div id="cloud-upload-eta" class="cloud-upload-eta">ETA: calculating…</div>
+        </div>
+        <div id="cloud-upload-elapsed" class="cloud-upload-elapsed">Elapsed: 00:00</div>
+      </div>
+    </div>
   </main>
 
   <script src="app.js"></script>
