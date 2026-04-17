@@ -1,0 +1,22 @@
+sequenceDiagram
+    participant Admin
+    participant Main as C++ CLI
+    participant Engine as Session Engine
+    participant System as Linux OS
+    
+    Admin->>Main: vanish start privacy
+    Main->>Engine: Initiate start request
+    Engine->>System: useradd -m vanish_random
+    Engine->>System: Initialize local IP tables rules
+    Engine->>System: mount -t tmpfs (Privacy mode)
+    Engine-->>Admin: Session Active
+    
+    note over Engine,System: Watcher Daemon monitors session state implicitly.
+    
+    Admin->>Main: vanish stop
+    Main->>Engine: Initiate stop request
+    Engine->>System: loginctl terminate-user
+    Engine->>System: pkill -9 -u vanish_random
+    Engine->>System: umount -l home_dir
+    Engine->>System: userdel -r vanish_random
+    Engine-->>Admin: Session Destroyed Thoroughly

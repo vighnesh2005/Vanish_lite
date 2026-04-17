@@ -1,0 +1,151 @@
+\chapter{Implementation Details}
+
+\section{Environment Setup}
+
+\begin{table}[H]
+\centering
+\caption{Development and Test Environment}
+\label{tab:environment}
+\begin{tabularx}{\linewidth}{p{4.5cm} X}
+\toprule
+Parameter & Specification \\
+\midrule
+Operating System & Ubuntu 22.04 LTS (kernel 5.15.0-97-generic) \\
+Compiler & GCC 11.4.0 with \texttt{-std=c++17 -O2 -Wall -Wextra} \\
+Linker flags & \texttt{-lstdc++fs} (filesystem library) \\
+Python version & 3.10.12 \\
+Python packages & Flask 3.0.x, Flask-CORS \\
+Network tools & \texttt{iptables} 1.8.7, \texttt{iproute2} 5.15 \\
+Shell & GNU bash 5.1.16 \\
+RAM & 16~GB DDR4 \\
+CPU & Intel Core i5-10400 (6 cores, 12 threads) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Module Descriptions}
+
+\begin{table}[H]
+\centering
+\caption{Vanish Lite Engine Modules}
+\label{tab:modules}
+\begin{tabularx}{\linewidth}{p{4.5cm} l X}
+\toprule
+Module & Lang & Responsibility \\
+\midrule
+\texttt{main.cpp} & C++ & CLI argument parsing; mode and config dispatch \\
+\texttt{session.cpp} & C++ & User creation, logout watcher, session teardown, config snapshots \\
+\texttt{session.h} & C++ & Session data structures and function declarations \\
+\texttt{session\_manager.cpp} & C++ & Session record persistence; active session enumeration \\
+\texttt{policy\_enforcer.cpp} & C++ & All mode-specific policy application and cleanup \\
+\texttt{policy\_enforcer.h} & C++ & \texttt{PolicyConfig} struct; mode enum; function prototypes \\
+\texttt{netguard\_preload.cpp} & C++ & \texttt{LD\_PRELOAD} shared library for user-space network interception \\
+\texttt{user\_netguard.cpp} & C++ & Per-user process-local socket guard for online mode \\
+\texttt{utils.cpp}/\texttt{utils.h} & C++ & Username generation; user-existence check; logging helpers \\
+\texttt{server.py} & Python & Flask REST API; subprocess invocation; preset management \\
+\texttt{index.html}/\texttt{app.js} & Web & Single-page administration UI \\
+\texttt{styles.css} & CSS & Dark-mode themed administration panel styling \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Data-Flow Between Components}
+
+\begin{table}[H]
+\centering
+\caption{Inter-Component Data Flow}
+\label{tab:dataflow}
+\begin{tabularx}{\linewidth}{p{3cm} p{3.5cm} X}
+\toprule
+Source & Destination & Data Transferred \\
+\midrule
+Browser UI & Flask API & JSON: mode, username, password, policy \\
+Flask API & \texttt{vanish} binary & CLI arguments via \texttt{subprocess.run()} \\
+\texttt{vanish} binary & \texttt{/var/vanish\_sessions/} & Session record, policy snapshot, compliance JSON \\
+Logout watcher & \texttt{session.cpp} & Trigger: user process count drops to zero \\
+Flask API & Browser UI & JSON: active sessions, status, compliance reports \\
+\texttt{server.py} & \texttt{presets.json} & Serialised preset configurations \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Session Record Format}
+
+Each active session produces a record file at \texttt{/var/\allowbreak vanish\_sessions/\allowbreak<user>} and an accompanying compliance report at \texttt{/var/\allowbreak vanish\_sessions/\allowbreak<user>\allowbreak .report.json}. The compliance report captures the mode applied, all boolean policy flags, numeric resource limits, and the \texttt{persist\_\allowbreak until\_\allowbreak shutdown} flag, providing an auditable snapshot of the exact security posture at session creation time.
+
+\section{Core Engine Modules Implementation}
+
+\subsection{Username Validation (\texttt{session.cpp})}
+
+The engine enforces POSIX-safe usernames using a compile-time \texttt{std::regex}:
+\begin{lstlisting}[style=cppstyle, caption=Username validation in session.cpp]
+bool isValidLinuxUsername(const std::string& username) {
+    static const std::regex pattern("^[a-z_][a-z0-9_-]{0,30}$");
+    return std::regex_match(username, pattern);
+}
+\end{lstlisting}
+This prevents injection attacks where an adversary might supply a crafted username (e.g., containing semicolons or shell metacharacters) to hijack the subprocess invocation chain.
+
+\subsection{Logout Watcher (\texttt{session.cpp})}
+
+Rather than registering a PAM hook (which is brittle across termination pathways), Vanish Lite launches a self-contained \texttt{bash} watcher as a detached background process. The watcher polls \texttt{pgrep -u \$u} every five seconds. It transitions through a two-state automaton:
+
+\begin{equation}
+    \text{state}_{\text{watcher}} \in \{\textsc{Unseen},\; \textsc{Active},\; \textsc{Cleanup}\}
+\end{equation}
+
+The \textsc{Unseen} $\to$ \textsc{Active} transition fires when \texttt{pgrep} reports at least one process; the \textsc{Active} $\to$ \textsc{Cleanup} transition fires when \texttt{pgrep} returns an empty set. This two-phase detection prevents premature cleanup of sessions that have been created but not yet logged into.
+
+\subsection{Policy Engine (\texttt{policy\_enforcer.cpp})}
+
+The policy enforcer implements six distinct sub-systems:
+
+\begin{enumerate}
+    \item \textbf{Network restriction} (\texttt{applyNetworkRestriction}): Creates a per-UID \texttt{iptables} chain, inserts a loopback-only ACCEPT rule, and appends a DROP-all rule.
+    \item \textbf{Exam persistence} (\texttt{setupExamPersistence}): Creates \texttt{/var/vanish\_exam\_submissions/\allowbreak \$USER}, mounts it via \texttt{--bind} to \texttt{\$HOME/submit}, preserving examination output after session end.
+    \item \textbf{RAM home} (\texttt{enableRamHome}): Mounts a \texttt{tmpfs} of configurable size on \texttt{/home/\$USER}, ensuring all session data is volatile.
+    \item \textbf{Privacy DNS} (\texttt{applyPrivacyDNS}): Inserts per-user \texttt{iptables} rules allowing DNS only to Cloudflare resolvers (1.1.1.1, 1.0.0.1) and rejecting all other DNS traffic.
+    \item \textbf{Telemetry block} (\texttt{blockTelemetry}): Resolves known telemetry domains (e.g., \texttt{google-analytics.com}) at session creation time and installs per-IP DROP rules.
+    \item \textbf{Command restriction} (\texttt{applyOnlineCommandRestrictions}): Generates a \texttt{\textasciitilde/.vanish\_command\_guard.sh} with bash \texttt{alias} overrides that intercept blocked commands and print a policy violation message.
+\end{enumerate}
+
+\subsection{Online Mode Network Guard (\texttt{netguard\_preload.cpp})}
+
+In \texttt{online} mode, an additional user-space network interceptor is deployed. The file \texttt{libvanish\_netguard.so} is installed into the session user's \texttt{\textasciitilde/.local/lib/} and automatically loaded via \texttt{LD\_PRELOAD} (injected through \texttt{environment.d}). This shared library intercepts \texttt{connect()} system call wrappers and enforces the allow/block domain list at the libc level, providing a second enforcement layer complementing the kernel-level \texttt{iptables} rules.
+
+\subsection{Administration Panel (\texttt{server.py})}
+
+The Flask server implements the following REST endpoints:
+
+\begin{table}[H]
+\centering
+\caption{Administration Panel REST API Endpoints}
+\label{tab:api_endpoints}
+\begin{tabularx}{\linewidth}{l p{4.5cm} X}
+\toprule
+Method & Endpoint & Description \\
+\midrule
+POST & \texttt{/api/session/create} & Create a new session with policy \\
+POST & \texttt{/api/session/stop} & Terminate session by username \\
+POST & \texttt{/api/session/stop\_all} & Terminate all active sessions \\
+GET  & \texttt{/api/sessions} & List active sessions with metadata \\
+GET  & \texttt{/api/session/report} & Fetch compliance JSON \\
+GET  & \texttt{/api/session/config} & Fetch policy snapshot \\
+POST & \texttt{/api/preset/save} & Save a named policy preset \\
+GET  & \texttt{/api/preset/list} & List all saved presets \\
+POST & \texttt{/api/preset/load} & Load a preset by name \\
+DELETE & \texttt{/api/preset/delete} & Delete a preset by name \\
+POST & \texttt{/api/session/validate} & Dry-run policy validation \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Cleanup and Teardown Resiliency}
+
+Teardown cannot merely execute \texttt{userdel -r} as background processes might lock the directory or prevent user deletion. The implementation:
+\begin{enumerate}
+    \item Invokes \texttt{loginctl terminate-user} to evict GUI sessions directly via \texttt{systemd}.
+    \item Executes \texttt{pkill -9 -u} explicitly sending SIGKILL to orphan child trees.
+    \item Lazily un-mounts the RAM disk structures using \texttt{umount -l}.
+    \item Forcibly strips the user configuration and directories utilizing resilient timeouts preventing race conditions during directory unlocking.
+\end{enumerate}

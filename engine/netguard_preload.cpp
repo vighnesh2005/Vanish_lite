@@ -293,6 +293,50 @@ bool shouldBlock(const string& ip, int port)
 }
 
 using ConnectFn = int (*)(int, const struct sockaddr*, socklen_t);
+using GetAddrInfoFn = int (*)(const char*, const char*, const struct addrinfo*, struct addrinfo**);
+using GetHostByNameFn = struct hostent* (*)(const char*);
+using GetHostByName2Fn = struct hostent* (*)(const char*, int);
+
+bool isDomainBlocked(const string& domain)
+{
+    if (domain.empty()) return false;
+    
+    lock_guard<mutex> lock(g_mutex);
+    reloadConfigLocked();
+
+    if (!g_config.online_enable_network) return true;
+
+    string normalized = normalizeDomain(domain);
+
+    if (!g_config.allowed_sites.empty()) {
+        bool allowed = false;
+        for (const auto& s : g_config.allowed_sites) {
+            if (normalized == s || 
+                (normalized.size() > s.size() && normalized.substr(normalized.size() - s.size()) == s && normalized[normalized.size() - s.size() - 1] == '.')) {
+                allowed = true;
+                break;
+            }
+        }
+        return !allowed;
+    }
+
+    if (!g_config.blocked_sites.empty()) {
+        for (const auto& s : g_config.blocked_sites) {
+            if (normalized == s || 
+                (normalized.size() > s.size() && normalized.substr(normalized.size() - s.size()) == s && normalized[normalized.size() - s.size() - 1] == '.')) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+thread_local int g_preload_depth = 0;
+struct PreloadGuard {
+    PreloadGuard() { g_preload_depth++; }
+    ~PreloadGuard() { g_preload_depth--; }
+};
 
 }  // namespace
 
@@ -303,6 +347,11 @@ extern "C" int connect(int sockfd, const struct sockaddr* addr, socklen_t addrle
         errno = EACCES;
         return -1;
     }
+
+    if (g_preload_depth > 0) {
+        return realConnect(sockfd, addr, addrlen);
+    }
+    PreloadGuard guard;
 
     string ip;
     int port = 0;
@@ -317,4 +366,60 @@ extern "C" int connect(int sockfd, const struct sockaddr* addr, socklen_t addrle
     logLine("Blocked connect() to " + ip + ":" + to_string(port));
     errno = EACCES;
     return -1;
+}
+
+extern "C" int getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res)
+{
+    static GetAddrInfoFn realGetAddrInfo = reinterpret_cast<GetAddrInfoFn>(dlsym(RTLD_NEXT, "getaddrinfo"));
+    if (!realGetAddrInfo) return EAI_SYSTEM;
+
+    if (g_preload_depth > 0) return realGetAddrInfo(node, service, hints, res);
+    PreloadGuard guard;
+
+    if (node && isDomainBlocked(node)) {
+        logLine("Blocked getaddrinfo() for " + string(node));
+        return EAI_NONAME;
+    }
+
+    return realGetAddrInfo(node, service, hints, res);
+}
+
+extern "C" struct hostent *gethostbyname(const char *name)
+{
+    static GetHostByNameFn realGetHostByName = reinterpret_cast<GetHostByNameFn>(dlsym(RTLD_NEXT, "gethostbyname"));
+    if (!realGetHostByName) {
+        h_errno = NO_RECOVERY;
+        return nullptr;
+    }
+
+    if (g_preload_depth > 0) return realGetHostByName(name);
+    PreloadGuard guard;
+
+    if (name && isDomainBlocked(name)) {
+        logLine("Blocked gethostbyname() for " + string(name));
+        h_errno = HOST_NOT_FOUND;
+        return nullptr;
+    }
+
+    return realGetHostByName(name);
+}
+
+extern "C" struct hostent *gethostbyname2(const char *name, int af)
+{
+    static GetHostByName2Fn realGetHostByName2 = reinterpret_cast<GetHostByName2Fn>(dlsym(RTLD_NEXT, "gethostbyname2"));
+    if (!realGetHostByName2) {
+        h_errno = NO_RECOVERY;
+        return nullptr;
+    }
+
+    if (g_preload_depth > 0) return realGetHostByName2(name, af);
+    PreloadGuard guard;
+
+    if (name && isDomainBlocked(name)) {
+        logLine("Blocked gethostbyname2() for " + string(name));
+        h_errno = HOST_NOT_FOUND;
+        return nullptr;
+    }
+
+    return realGetHostByName2(name, af);
 }

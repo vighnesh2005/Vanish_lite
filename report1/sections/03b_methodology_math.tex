@@ -1,0 +1,187 @@
+\chapter{Methodology and Mathematical Formulation}
+
+% ============================================================
+%  Methodology
+% ============================================================
+\section{Methodology}
+\label{sec:methodology}
+
+\subsection{End-to-End Pipeline}
+
+The Vanish Lite workflow follows a five-phase pipeline illustrated in Figure~\ref{fig:pipeline}:
+
+\begin{enumerate}[label=\textbf{Phase \arabic*:}, leftmargin=5em]
+    \item \textbf{Request Parsing} — The administrator submits a session creation request via the web UI or CLI, specifying a mode $m \in \mathcal{M}$, optional username/password, and a policy configuration object $\Pi$.
+    \item \textbf{User Provisioning} — The C++ engine validates the username against the POSIX-safe regex \texttt{\textasciicircum[a-z\_]\allowbreak[a-z0-9\_\text{-}]\allowbreak\{0,30\}\$}, creates the Linux user via \texttt{useradd -m -s /bin/bash}, sets the password via a temporary \texttt{chpasswd} file, and registers the username in the managed-user registry at \texttt{/var/\allowbreak vanish\_sessions/\allowbreak .managed\_users}.
+    \item \textbf{Policy Application} — Mode-specific policy functions are invoked atomically: network chains are created and populated in \texttt{iptables}, \texttt{tmpfs} mounts are applied if desired, shell guard scripts are injected into \texttt{\textasciitilde/.bashrc}, and per-session snapshots are written to \texttt{/var/vanish\_sessions/}.
+    \item \textbf{Session Monitoring} — A background logout-watcher process (launched via \texttt{nohup}) polls for the ephemeral user's process list at five-second intervals. Upon detecting that the user has logged in (confirmed by at least one process under their UID) and subsequently logged out (zero processes remain), the watcher autonomously triggers cleanup.
+    \item \textbf{Teardown} — The cleanup sequence executes in the following deterministic order: (a) remove per-user \texttt{iptables} chain; (b) \texttt{pkill -9 -u \$USER}; (c) \texttt{loginctl terminate-user \$USER}; (d) \texttt{umount -l /home/\$USER/submit}; (e) \texttt{umount -l /home/\$USER}; (f) \texttt{userdel -f -r \$USER}; (g) delete session snapshot and compliance report files.
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        node distance=0.8cm and 0.4cm,
+        box/.style={rectangle, rounded corners=4pt, draw=primary, fill=accent, minimum width=2.8cm, minimum height=0.9cm, font=\small\bfseries, text centered},
+        arr/.style={-latex, thick, primary}
+    ]
+    \node[box] (req)  {Request Parsing};
+    \node[box, right=0.8cm of req]  (prov) {User Provisioning};
+    \node[box, right=0.8cm of prov] (pol)  {Policy Application};
+    \node[box, below=1cm of pol]  (mon)  {Session Monitoring};
+    \node[box, left=0.8cm of mon]   (tear) {Teardown};
+    \draw[arr] (req) -- (prov);
+    \draw[arr] (prov) -- (pol);
+    \draw[arr] (pol) -- (mon);
+    \draw[arr] (mon) -- (tear);
+    \end{tikzpicture}
+    \caption{Vanish Lite end-to-end session lifecycle pipeline.}
+    \label{fig:pipeline}
+\end{figure}
+
+\subsection{Pseudo-Mathematical Workflow Specification}
+
+Let the system state be represented as a tuple $\Sigma = (\mathcal{U}, \mathcal{F}, \mathcal{N}, \mathcal{P})$ where:
+\begin{itemize}
+    \item $\mathcal{U}$: set of active Linux users on the host.
+    \item $\mathcal{F}$: set of active filesystem mount points.
+    \item $\mathcal{N}$: set of active \texttt{iptables} rules.
+    \item $\mathcal{P}$: set of running processes with their UIDs.
+\end{itemize}
+
+\noindent\textbf{Session Creation:}
+\begin{align}
+    \Sigma' &= \texttt{create}(u, m, \Pi) \notag \\
+    &= \Sigma \;\cup\; \{u \in \mathcal{U}\} \;\cup\; \texttt{mount}(\Pi, u) \;\cup\; \texttt{firewall}(\Pi, u)
+\end{align}
+
+\noindent\textbf{Session Teardown:}
+\begin{align}
+    \Sigma'' &= \texttt{destroy}(u) \notag \\
+    &= \Sigma' \setminus \Big( \{u\} \cup \mathcal{F}(u) \cup \mathcal{N}(u) \cup \mathcal{P}(u) \Big)
+\end{align}
+
+The invariant maintained by the system is:
+\begin{equation}
+    \boxed{\Sigma'' \equiv \Sigma \quad \forall\; u \in \mathcal{U}_{\text{ephemeral}}}
+    \label{eq:invariant}
+\end{equation}
+
+That is, after teardown, the host state is identical to the pre-creation state with respect to all ephemeral-user artefacts.
+
+\subsection{Workflow Step-by-Step}
+
+\begin{table}[H]
+\centering
+\caption{Vanish Lite Workflow Steps and Responsible Components}
+\label{tab:workflow_steps}
+\begin{tabularx}{\linewidth}{p{1cm} p{5.5cm} X}
+\toprule
+Step & Responsible Module & Action \\
+\midrule
+1 & \texttt{main.cpp} & Parse CLI args; authenticate API caller \\
+2 & \texttt{session.cpp} & Validate username/password; call \texttt{useradd} \\
+3 & \texttt{policy\_enforcer.cpp} & Apply mode-specific policy bundle \\
+4 & \texttt{session.cpp} & Write session record + compliance JSON \\
+5 & \texttt{session.cpp} & Register user in managed-users file \\
+6 & \texttt{session.cpp} & Launch background logout-watcher \\
+7 & \texttt{server.py} & Return session details to UI \\
+8 & Logout watcher & Detect user logout; trigger cleanup \\
+9 & \texttt{session.cpp}/\texttt{policy\_enforcer.cpp} & Execute teardown sequence \\
+10 & \texttt{session\_manager.cpp} & Remove session record; deregister user \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ============================================================
+%  Mathematical Formulation
+% ============================================================
+\section{Mathematical Formulation}
+\label{sec:math_formulation}
+
+\subsection{System State Model}
+
+Define the system state tuple $\Sigma = (\mathcal{U}, \mathcal{F}, \mathcal{N}, \mathcal{P}, \mathcal{R})$ where:
+
+\begin{align*}
+    \mathcal{U} &= \text{set of active Linux UIDs on the host} \\
+    \mathcal{F} &= \text{set of active mount-point records: } \{(u, p, t)\} \\
+    &\quad \text{where } u \in \mathcal{U},\; p = \text{path},\; t \in \{\texttt{tmpfs}, \texttt{bind}\} \\
+    \mathcal{N} &= \text{set of active iptables rules: } \{(u, \text{chain}, \text{rule})\} \\
+    \mathcal{P} &= \text{set of running processes: } \{(u, \text{pid})\} \\
+    \mathcal{R} &= \text{session record store: } \mathcal{U}_{\text{vanish}} \to \text{JSON}
+\end{align*}
+
+\subsection{Mode Policy Function}
+
+Each operational mode $m \in \mathcal{M}$ maps to a policy tuple:
+
+\begin{equation}
+    \Pi(m) = \Big\langle \pi_{\text{net}}(m),\; \pi_{\text{fs}}(m),\; \pi_{\text{proc}}(m),\; \pi_{\text{cmd}}(m) \Big\rangle
+    \label{eq:policy_tuple}
+\end{equation}
+
+where individual policy components are defined as:
+\begin{align}
+    \pi_{\text{net}}(m) &\in \{0, 1\}^k, \quad k = \text{number of binary network flags for mode } m \\
+    \pi_{\text{fs}}(m)  &= \big(\texttt{ram\_home} \in \{0,1\},\; \text{size\_MB} \in \mathbb{Z}^+,\; \texttt{persist} \in \{0,1\}\big) \\
+    \pi_{\text{proc}}(m) &= n_{\text{proc}} \in \mathbb{Z}^+ \cup \{-1\}, \quad -1 \text{ denotes ``no override''} \\
+    \pi_{\text{cmd}}(m)  &\subseteq \Sigma^* \quad \text{(set of blocked command strings)}
+\end{align}
+
+\textbf{Default process limit mapping:}
+\begin{equation}
+    n_{\text{proc}}(m) = \begin{cases}
+        1500 & m = \texttt{dev} \\
+        1200 & m \in \{\texttt{secure}, \texttt{privacy}\} \\
+        800  & m \in \{\texttt{exam}, \texttt{online}\}
+    \end{cases}
+    \label{eq:proc_limits}
+\end{equation}
+
+\subsection{iptables Per-User Chain Algebra}
+
+For an ephemeral user $u$ with UID $\mu$, Vanish Lite creates a dedicated chain $C_\mu = \texttt{VANISH\_U}\mu$. The chain insertion into the OUTPUT hook is:
+
+\begin{equation}
+    \texttt{iptables} \;-A\; \texttt{OUTPUT} \;-m\; \texttt{owner} \;\text{--uid-owner}\; \mu \;-j\; C_\mu
+\end{equation}
+
+For the \texttt{exam} mode (full network block):
+\begin{align}
+    C_\mu &\leftarrow \texttt{ACCEPT}\;\text{(if destination is loopback)} \\
+    C_\mu &\leftarrow \texttt{DROP}\;\text{(all other traffic)}
+\end{align}
+
+For the \texttt{privacy} mode with telemetry blocking (blocking telemetry IPs $\mathcal{T} = \{ip_1, ip_2, \ldots\}$):
+\begin{align}
+    C_\mu &\leftarrow \texttt{REJECT}\;\text{ for each } ip_t \in \mathcal{T},\; \text{dport} \in \{80, 443\} \\
+    C_\mu &\leftarrow \texttt{ACCEPT}\;\text{(default loopback)} \\
+    C_\mu &\leftarrow \texttt{RETURN}
+\end{align}
+
+\subsection{RAM Home Availability Model}
+
+Let $M_{\text{RAM}}$ be the total system RAM and $M_{\text{alloc}}$ be the sum of all currently allocated \texttt{tmpfs} home directories. A new session's RAM home of size $s$ is admitted if and only if:
+
+\begin{equation}
+    s + M_{\text{alloc}} \leq \alpha \cdot M_{\text{RAM}}, \quad \alpha \in (0, 1)
+    \label{eq:ram_constraint}
+\end{equation}
+
+In practice, the system does not enforce \Cref{eq:ram_constraint} explicitly—the Linux kernel's \texttt{tmpfs} implementation transparently uses swap when RAM pressure occurs. However, the administrator panel documents this constraint and warns when $\sum s_i > 0.5 \cdot M_{\text{RAM}}$.
+
+\subsection{Cleanup Completeness Proof Sketch}
+
+\textbf{Claim:} After \texttt{destroy}($u$), $\Sigma'' = \Sigma$ (see \Cref{eq:invariant}).
+
+\textbf{Proof Sketch:}
+\begin{enumerate}
+    \item $\mathcal{N}(u) = \emptyset$ after \texttt{iptables -D/-F/-X} on $C_\mu$. \checkmark
+    \item $\mathcal{P}(u) = \emptyset$ after \texttt{pkill -9 -u u} \textsc{and} \texttt{loginctl terminate-user u}. \checkmark
+    \item $\mathcal{F}(u) = \emptyset$ after \texttt{umount -l} on all mounts under \texttt{/home/u}. The lazy unmount flag (\texttt{-l}) ensures success even if a process holds the mount open. \checkmark
+    \item $u \notin \mathcal{U}$ after \texttt{userdel -f -r u} removes both the account and the home directory tree. \checkmark
+    \item $\mathcal{R}(u)$ deleted by \texttt{deleteSessionSnapshots(u)} and \texttt{unregisterManagedUser(u)}. \checkmark
+\end{enumerate}
+
+The managed-user registry provides a secondary lookup path guaranteeing that cleanup succeeds even if the session record file is missing (e.g., corrupted by an unexpected host crash). \qed

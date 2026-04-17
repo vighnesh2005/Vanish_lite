@@ -1,0 +1,22 @@
+\chapter{System Architecture}
+
+\section{Overview}
+Project Vanish Lite is partitioned into two primary functional halves: the low-level Local Execution System handling daemon creation and restrictions, and the higher-level Web Admin Panel orchestrating monitoring and visualization. The system operates strictly locally, eliminating the need for complex cloud orchestration components and decreasing latency natively.
+
+\begin{figure}[htp]
+    \centering
+    % Placeholder for the architecture diagram which we will generate as a flowchart
+    \input{figures/architecture}
+    \caption{Vanish Lite High-Level Architecture Diagram}
+    \label{fig:architecture}
+\end{figure}
+
+\section{Core Components}
+\subsection{C++ Session Engine}
+The engine accepts commands via a standard CLI interface (\texttt{main.cpp}). It parses the requested operational mode and directly manipulates the system's underlying \texttt{passwd} user databases to generate sandboxed temporary users (\texttt{vanish\_*}). State management is orchestrated through the \texttt{session\_manager.cpp}, which stores live session timers within protected directories (\texttt{/var/vanish\_sessions/}). 
+
+\subsection{Policy Enforcer}
+Located fundamentally in \texttt{policy\_enforcer.cpp}, this component dynamically generates Linux network rules applying IP tables blocks and routing overrides (such as overriding DNS files per user). Depending on the \texttt{Strict Mode} or \texttt{Online Mode}, specific URL allow/block combinations are enforced immediately upon session instantiation.
+
+\subsection{Python Admin Dashboard}
+Built utilizing standard Python synchronous methodologies, the API parses static log structures and config snapshots to render a visual representation of active sessions, security overrides, and system compliance. The dashboard includes a dry-run feature natively simulating the engine parameters before executing root-level modifications.

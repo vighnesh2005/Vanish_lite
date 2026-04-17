@@ -1,0 +1,24 @@
+\begin{tikzpicture}[node distance=2cm and 2cm,
+    box/.style={rectangle, draw, minimum width=3cm, minimum height=1cm, text centered, rounded corners},
+    arrow/.style={thick,->,>=stealth}]
+
+    \node (user) [box, fill=blue!10] {Administrator};
+    \node (engine) [box, fill=red!10, below left=of user] {C++ Execution Engine};
+    \node (ui) [box, fill=green!10, below right=of user] {Python Admin Panel};
+    
+    \node (policy) [box, fill=yellow!10, below=of engine] {Policy Enforcer};
+    \node (session) [box, fill=yellow!10, right=of policy] {Session Manager};
+    
+    \node (iptables) [box, fill=gray!10, below=of policy] {IP Tables / FS Mounts};
+    \node (os) [box, fill=gray!10, below=of session] {Linux OS Commands};
+
+    \draw [arrow] (user) -- node[anchor=east, align=center] {vanish start/stop} (engine);
+    \draw [arrow] (user) -- node[anchor=west, align=center] {Views UI \\ \& Presets} (ui);
+    \draw [arrow, dashed] (ui) -- node[anchor=north] {Reads Logs/Configs} (engine);
+    
+    \draw [arrow] (engine) -- (policy);
+    \draw [arrow] (engine) -- (session);
+    
+    \draw [arrow] (policy) -- (iptables);
+    \draw [arrow] (session) -- (os);
+\end{tikzpicture}

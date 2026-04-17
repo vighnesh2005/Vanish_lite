@@ -236,7 +236,7 @@ void installOnlineUserGuard(const string& username, const PolicyConfig& config)
         "esac\n";
     ensureLineBlock(bashrcPath, marker, bashrcBlock);
 
-    system(("chown -R " + username + ":" + username + " " + configDir + " " + envDir + " " + localBinDir + " " + localLibDir + " " + bashrcPath).c_str());
+    system(("chown -R " + username + ":" + username + " " + homeDir + "/.config " + homeDir + "/.local " + bashrcPath).c_str());
     system(("chmod 700 " + localBinDir).c_str());
     system(("chmod 755 " + localLibDir).c_str());
     system(("chmod 700 " + configDir + " " + envDir).c_str());
@@ -433,6 +433,10 @@ void createSession(Mode mode, const string& requestedUsername, const string& req
     registerManagedUser(username);
     writeSessionConfigSnapshots(username, mode, config);
     writeSessionComplianceReport(username, mode, config, persistUntilShutdown);
+    // [FIX] Ensure Firefox Snap can launch content processes for newly created users
+    // This is required on Ubuntu 24.04+ where unprivileged user namespaces are restricted by default.
+    system("sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 >/dev/null 2>&1");
+
     startLogoutWatcher(username, persistUntilShutdown);
 
     cout << "\n=====================================\n";

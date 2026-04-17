@@ -1,0 +1,38 @@
+\chapter{Team Contributions}
+
+The execution of Project Vanish Lite was partitioned evenly among four team members, ensuring that the heavy lower-level engine routines and the higher-level monitoring dashboards received adequate engineering focus.
+
+\begin{table}[h]
+    \centering
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabularx}{\textwidth}{|>{\bfseries}l|X|}
+    \hline
+    \rowcolor
+    Team Member & Implemented Features \\
+    \hline
+    N. Pranav & \textbf{C++ Session Engine \& Lifecycle:} Designed the core \texttt{main.cpp} daemon, handled UNIX user creation (\texttt{useradd -m}), and managed the complex teardown resilient loop employing \texttt{pkill} and process verification. \\
+    \hline
+    M. Vighnesh Prasad & \textbf{Policy Enforcer Mechanics:} Responsible for \texttt{policy\_enforcer.cpp}. Implemented dynamic \texttt{iptables} restrictions, the RAM-disk home mount configuration (\texttt{tmpfs}) for Privacy Mode, and the Exam mode network isolation rules. \\
+    \hline
+    G. V. Sai Srivardhan & \textbf{Python Administrative API:} Engineered the Python backend (\texttt{server.py}), handling asynchronous request routing, configuration snapshot parsing, and bridging the gap between C++ states and the web interface. \\
+    \hline
+    V Siva Sai & \textbf{Frontend UI \& Integration Testing:} Developed the visual dashboard components (HTML/JS/CSS), integrating the real-time mode-selection switches alongside the shell-runner verification scripts verifying isolation boundaries. \\
+    \hline
+    \end{tabularx}
+    \caption{Even distribution of features and contributions amongst the four team members.}
+    \label{tab:contributions}
+\end{table}
+
+\section{Technical Contributions}
+
+\begin{enumerate}[label=\textbf{C\arabic*.}]
+    \item \textbf{Dual-Layer Network Enforcement:} Vanish Lite is, to the best of the authors' knowledge, the first per-session desktop isolation system to combine kernel-level \texttt{iptables} per-user chain injection \emph{with} user-space \texttt{LD\_PRELOAD} socket interception for online mode. This dual-layer approach prevents both direct socket access and library-level bypass attempts.
+
+    \item \textbf{Mode-Driven Policy Abstraction:} The five-mode taxonomy (\texttt{dev}, \texttt{secure}, \texttt{privacy}, \texttt{exam}, \texttt{online}) provides a structured vocabulary for expressing session security posture without requiring administrators to understand low-level \texttt{iptables} syntax. Each mode maps to a rigorously defined policy bundle (see \Cref{eq:policy_tuple}).
+
+    \item \textbf{Two-State Logout Watcher Automaton:} The two-phase watcher (Unseen $\to$ Active $\to$ Cleanup) prevents premature cleanup of pre-login sessions. Existing cleanup scripts typically trigger on logout signal alone, which misses the pre-login window during which an administrator might inspect the environment.
+
+    \item \textbf{Resilient Multi-Path Teardown:} By maintaining a managed-user registry independent of session record files, the cleanup subsystem can recover from partial failures (e.g., a session record file deleted manually) and still complete full cleanup. This property was validated through deliberate fault injection testing (see \Cref{sec:evaluation}).
+
+    \item \textbf{Preset System with Dry-Run Validation:} The preset management system allows institutions to encode site-specific security policies as named presets and validate them against the policy engine before applying them to live sessions, reducing configuration errors in production deployments.
+\end{enumerate}

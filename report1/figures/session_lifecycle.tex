@@ -1,0 +1,21 @@
+\begin{tikzpicture}[node distance=0.8cm and 2cm,
+    process/.style={rectangle, draw, minimum width=4cm, minimum height=1cm, text centered, rounded corners, fill=orange!10},
+    arrow/.style={thick,->,>=stealth}]
+
+    \node (start) [process, fill=blue!10] {vanish start \textless mode\textgreater};
+    \node (useradd) [process, below=of start] {1. Create Temp User (useradd -m)};
+    \node (policy) [process, below=of useradd] {2. Enforce Mode (iptables, tmpfs)};
+    \node (session) [process, below=of policy, fill=green!10] {3. Active Session (Watcher spawned)};
+    \node (stop) [process, below=of session, fill=red!10] {4. vanish stop / Timeout Expired};
+    \node (loginctl) [process, below=of stop] {5. Terminate GUI (loginctl)};
+    \node (pkill) [process, below=of loginctl] {6. Kill Processes (pkill -9)};
+    \node (userdel) [process, below=of pkill] {7. Remove Traces (userdel -r)};
+    
+    \draw [arrow] (start) -- (useradd);
+    \draw [arrow] (useradd) -- (policy);
+    \draw [arrow] (policy) -- (session);
+    \draw [arrow] (session) -- (stop);
+    \draw [arrow] (stop) -- (loginctl);
+    \draw [arrow] (loginctl) -- (pkill);
+    \draw [arrow] (pkill) -- (userdel);
+\end{tikzpicture}

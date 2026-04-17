@@ -1,0 +1,19 @@
+graph TD
+    User([Administrator])
+    subLayer2[Python Admin Panel]
+    subLayer3[C++ Execution Engine]
+    
+    User -->|Views Dashboards/Presets| subLayer2
+    User -->|Issues vanish start| subLayer3
+    
+    subLayer2 -.->|Reads Logs/Configs| subLayer3
+    subLayer2 -->|Simulates Dry Run| subLayer3
+    
+    subLayer3 --> B[Policy Enforcer]
+    subLayer3 --> C[Session Manager]
+    
+    B -->|Generates Network Rules| D(IP Tables)
+    B -->|Mounts Specific Volumes| E(tmpfs / persistence)
+    
+    C -->|Handles Daemon| F(Watcher Script)
+    C -->|useradd / userdel| G(Linux Native Commands)

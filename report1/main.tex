@@ -1,0 +1,200 @@
+\documentclass[12pt,a4paper]{report}
+
+% Encoding & Layout
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+
+% Graphics & Links
+\usepackage{graphicx}
+\usepackage{hyperref}
+
+% Color Palette (Elegant Purple + Gold)
+\usepackage{xcolor}
+\definecolor{primary}{RGB}{88, 24, 69}      % Deep Purple
+\definecolor{secondary}{RGB}{199, 161, 122} % Soft Gold
+\definecolor{accent}{RGB}{245, 240, 250}    % Light background
+
+% Header/Footer
+\usepackage{fancyhdr}
+
+% Section Styling
+\usepackage{titlesec}
+
+% Tables & Listings
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{listings}
+
+% Figures & Mathematics
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{float}
+
+% Lists & References
+\usepackage{enumitem}
+\usepackage{cleveref}
+
+% TikZ for borders
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+
+% DOUBLE BORDER DESIGN
+\usepackage{eso-pic}
+\AddToShipoutPictureBG{
+\begin{tikzpicture}[remember picture,overlay]
+
+    % Outer Border
+    \draw[line width=2pt, color=primary!70] 
+        ([shift={(0.8cm,-0.8cm)}]current page.north west) 
+        rectangle 
+        ([shift={(-0.8cm,0.8cm)}]current page.south east);
+
+    % Inner Border
+    \draw[line width=0.8pt, color=secondary!80] 
+        ([shift={(1.2cm,-1.2cm)}]current page.north west) 
+        rectangle 
+        ([shift={(-1.2cm,1.2cm)}]current page.south east);
+
+\end{tikzpicture}
+}
+
+% Hyperref Setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primary,
+    urlcolor=secondary,
+    pdftitle={Project Vanish Lite Report}
+}
+
+% Header/Footer Styling
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\textcolor{primary}{Project Vanish Lite}}
+\rhead{\textcolor{secondary}{PDP Report}}
+\cfoot{\thepage}
+
+% CENTERED CHAPTER STYLE
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\centering\color{primary}}
+  {}
+  {0pt}
+  {\vspace{2cm}
+   \textcolor{secondary}{\rule{0.5\textwidth}{1pt}}\\[1ex]
+   \Huge \bfseries}
+  [\vspace{1ex}\textcolor{secondary}{\rule{0.5\textwidth}{1pt}}]
+
+% Section Styling
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{primary}}
+  {\thesection}{1em}{}
+
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{secondary!90!black}}
+  {\thesubsection}{1em}{}
+
+% Spacing
+\titlespacing*{\chapter}{0pt}{0pt}{30pt}
+\titlespacing*{\section}{0pt}{12pt}{6pt}
+
+% Code Styling
+\lstset{
+    basicstyle=\ttfamily\small,
+    backgroundcolor=\color{accent},
+    frame=single,
+    rulecolor=\color{primary!40},
+    breaklines=true
+}
+
+\begin{document}
+
+% ================= TITLE PAGE =================
+\begin{titlepage}
+    \centering
+    \includegraphics[width=0.34\textwidth]{iiitdmk_logo.jpeg}
+    
+    \vspace*{2cm}
+    {\Huge \bfseries \textcolor{primary}{Project Vanish Lite}\par}
+    \vspace{0.5cm}
+    {\Large \textcolor{secondary}{A Disposable Linux Workspace System}\par}
+    \vspace{2cm}
+    
+    \textcolor{secondary}{\rule{\textwidth}{1.5pt}}
+    \vspace{0.5cm}
+    
+    {\Large \textbf{Product Development Project Report}}
+    \vspace{0.5cm}
+
+    \textcolor{secondary}{\rule{\textwidth}{1.5pt}}
+    
+    \vspace{2cm}
+    
+    \begin{flushleft}
+    \textbf{Submitted to:}\\
+    Assistant Professor Alapan Kuila
+    
+    Dept of Computer Science and Engineering
+    
+    IIITDM Kurnool
+    \end{flushleft}
+    \vspace{1cm}
+    \begin{flushleft}
+    \textbf{Submitted by:}\\
+    123CS0004 N. Pranav
+    
+    123CS0052 M. Vighnesh Prasad
+    
+    123CS0058 G. V. Sai Srivardhan
+    
+    123AD0023 V. Siva Sai
+    \end{flushleft}
+    
+    \vfill
+    {\large \par}
+\end{titlepage}
+
+% ================= FRONT MATTER =================
+\pagenumbering{roman}
+\tableofcontents
+\newpage
+
+\listoffigures
+\listoftables
+\newpage
+
+% ================= MAIN CONTENT =================
+\pagenumbering{arabic}
+
+\input{sections/01_abstract_intro}
+\input{sections/02_problem_scope}
+\input{sections/03_architecture}
+\input{sections/03b_methodology_math}
+\input{sections/04_implementation}
+\input{sections/05_evaluation}
+\input{sections/07_contributions}
+\input{sections/06_conclusion_future}
+
+
+% ================= BIBLIOGRAPHY =================
+\begin{thebibliography}{9}
+
+\bibitem{docker}
+Docker Inc., \textit{Docker Documentation}, 
+\url{https://docs.docker.com/}.
+
+\bibitem{cgroups}
+Linux Kernel Organization, \textit{cgroups Documentation}, 
+\url{https://www.kernel.org/doc/Documentation/cgroup-v1/cgroups.txt}.
+
+\bibitem{selinux}
+Red Hat, \textit{SELinux Guide}, 
+\url{https://access.redhat.com/documentation}.
+
+\bibitem{firewalld}
+Firewalld Project, \textit{Firewalld Documentation}, 
+\url{https://firewalld.org/documentation/}.
+
+\end{thebibliography}
+
+\end{document}

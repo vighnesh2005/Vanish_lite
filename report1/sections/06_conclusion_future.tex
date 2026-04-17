@@ -1,0 +1,12 @@
+\chapter{Conclusion and Future Scope}
+
+\section{Conclusion}
+Project Vanish Lite presents an innovative, natively implemented method for guaranteeing stateless workspace computation utilizing local Linux users. Moving away from heavy hypervisors, the engineered C++ engine enforces comprehensive, mode-based restrictions alongside verified teardown algorithms that confidently destroy lingering processes and environments. Combined with the unified Python administrative interface, it bridges the gap between low-level terminal daemons and accessible management systems seamlessly.
+
+\section{Future Work}
+As detailed within the ongoing project roadmap, several crucial enhancements remain on the horizon:
+\begin{itemize}
+    \item \textbf{Tamper Protection:} Implementing explicit hashing algorithms validating the structure of \texttt{/var/vanish\_sessions/} specifically mitigating malicious deletion of accounting files.
+    \item \textbf{Advanced Network Contexts:} Transitioning away from global IP tables routing strategies to dedicated Network Namespaces (netns) providing profound containerized boundaries without requiring a full Docker orchestration footprint.
+    \item \textbf{Encrypted External Syncing:} Native integration with external blob storage via explicit user interactions utilizing localized AES encryption before exiting, enabling the re-installation of "states" across strictly separated physical machines.
+\end{itemize}

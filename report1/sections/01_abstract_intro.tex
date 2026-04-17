@@ -1,0 +1,20 @@
+\chapter{Introduction}
+
+\section{Abstract}
+In the era of heightened digital surveillance and security breaches, ensuring a safe computing environment presents a significant challenge. Threat actors often compromise systems by injecting malicious persistence mechanisms or extracting sensitive local data. Project Vanish Lite is a robust, dynamic, and disposable Linux user workspace system designed to mitigate these threats. It provisions temporary system users, applies policy-based restrictions depending on the specific threat model (e.g., Secure, Privacy, Exam, Online), and guarantees strict teardown mechanisms that enforce zero local persistence. This project demonstrates a secure stateless computing model that effectively decouples persistent user state from the host hardware . Engineered with a C++ core engine and a scalable Python backend, Vanish Lite achieves stringent isolation through dynamic configurations and native OS features.
+
+\section{Introduction}
+Modern computing relies heavily on persistent, mutable states. While this benefits long-term user experiences, it introduces inherent vulnerabilities: a compromised device remains compromised until thoroughly remitted. Digital forensics, exam monitoring, and privacy-conscious browsing all demand environments that return to a strictly defined clean state upon session termination.
+
+While cryptographic file systems try to conceal data, they do not inherently provide amnesia or stateless session guarantees. Virtualization tools like Docker or VMware offer sandboxing but bring significant orchestration overhead and heavy resource utilization. 
+
+Project Vanish Lite fundamentally diverges from typical sandboxing techniques. Instead of full virtualization or containerization, it interfaces at the host OS level by managing native Linux users dynamically. By injecting specific personal data only when authorized and forcefully annihilating the entire environment at shutdown, it achieves a secure, transparent, and ephemeral architecture.
+
+\subsection{Key Contributions}
+The core contributions of this work include:
+\begin{itemize}
+    \item \textbf{Dynamic Lifecycle Management:} An OS-level engine orchestrating the complete lifecycle of user creation, daemon execution, and session annihilation.
+    \item \textbf{Mode-Based Policy Engine:} Robust session controls mapped to predefined modes: \texttt{dev}, \texttt{secure}, \texttt{privacy}, \texttt{exam}, and \texttt{online}.
+    \item \textbf{Strict Teardown Guarantee:} Resilient session cleanup sequences employing recursive kill processes hooks and enforced un-mounting mechanisms to ensure zero local persistence.
+    \item \textbf{Administrative Web Interface:} An intuitive admin panel facilitating snapshot management, compliance reporting, and real-time session overview.
+\end{itemize}

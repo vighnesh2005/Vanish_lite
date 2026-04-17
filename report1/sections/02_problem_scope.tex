@@ -1,0 +1,39 @@
+\chapter{Problem Statement and Scope}
+
+\section{Problem Statement}
+Existing computing models manage state persistently across user sessions, creating a multitude of issues in high-security, educational, or highly private situations:
+\begin{table}[h]
+    \centering
+    \begin{tabularx}{\textwidth}{lX}
+    \toprule
+    \textbf{Limitation} & \textbf{Vanish Lite Resolution} \\
+    \midrule
+    State Persistence & Implements strict, resilient teardown guarantees enforcing zero local persistence through \texttt{userdel} and process termination hooks. \\
+    Resource Heavy Isolation & Operates inherently on the host OS by using Linux user paradigms and local group management instead of running heavy virtual machines. \\
+    Static Security Modeling & Provides dynamic mode-based policies (\texttt{dev}, \texttt{secure}, \texttt{privacy}, \texttt{exam}, \texttt{online}) configurable down to DNS resolution and USB access constraints. \\
+    Complex Auditing & Implements automated per-session snapshots and compliance reports, seamlessly integrated with a management web interface. \\
+    \bottomrule
+    \end{tabularx}
+    \caption{Limitations of traditional computing paradigms compared to Vanish Lite.}
+    \label{tab:limitations}
+\end{table}
+
+The primary technological hurdle lies in engineering an extensible session enforcement mechanism that can transparently intercept operations and apply strict quotas or network allowances without requiring deep kernel module dependencies.
+
+\section{Objectives}
+The core objectives of the Project Vanish Lite platform are to:
+\begin{enumerate}
+    \item Design an engine that correctly performs dynamic, error-free provisioning and deprovisioning of temporary Linux user accounts.
+    \item Implement tailored modes restricting CPU, memory, Network access, and specific executables using local firewall (\texttt{iptables}) commands and \texttt{cgroups}-like constraints.
+    \item Create a failsafe cleanup daemon guaranteeing the absolute removal of all temporary processes and persona configurations, preventing orphan environments.
+    \item Develop an intuitive Admin Dashboard providing total visibility, telemetry generation, and snapshot reviews.
+\end{enumerate}
+
+\section{Scope}
+The scope of the project encompasses the development, deployment, and testing of the Linux session management engine and the web-based administrative dashboard. It natively encompasses the following components:
+\begin{itemize}
+    \item \textbf{C++ Enforcement Engine:} Handles system calls, handles \texttt{sigaction} loops, and invokes network rule modifiers securely.
+    \item \textbf{Mode Policies:} \texttt{secure} (restricting peripheral input), \texttt{exam} (whitelisting network rules, mounting persistence drives), \texttt{privacy} (RAM-mounted home directories), and \texttt{online} (configurable dynamic networking paths).
+    \item \textbf{Server API:} A Python-backend orchestrating the user interface, session history reporting, and configurations.
+\end{itemize}
+The current iteration targets modern Linux distributions, assuming root execution privileges for the central daemon.
