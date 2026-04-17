@@ -42,8 +42,10 @@ Mode parseMode(const std::string& modeStr);
 PolicyConfig loadPolicyConfigFile(const std::string& path);
 
 void applyPolicies(const std::string& username, Mode mode, const PolicyConfig& config);
-
 void cleanupPolicies(const std::string& username);
+
+void disableUSB(const std::string& username);
+void enableUSB(const std::string& username);
 
 
 

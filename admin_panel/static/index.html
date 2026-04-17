@@ -45,7 +45,12 @@
         </div>
         <div class="field">
           <label for="password-input">Password</label>
-          <input id="password-input" type="password" placeholder="Default">
+          <div class="input-with-icon">
+            <input id="password-input" type="password" placeholder="Default">
+            <button type="button" class="password-toggle" data-target="password-input" aria-label="Toggle password visibility">
+              <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </button>
+          </div>
         </div>
         <div class="field">
           <label for="proc-limit-input">Process Limit</label>
@@ -213,7 +218,12 @@
           </div>
           <div class="field">
             <label for="cloud-auth-pass">Password</label>
-            <input id="cloud-auth-pass" type="password" placeholder="Min. 6 characters" autocomplete="current-password">
+            <div class="input-with-icon">
+              <input id="cloud-auth-pass" type="password" placeholder="Min. 6 characters" autocomplete="current-password">
+              <button type="button" class="password-toggle" data-target="cloud-auth-pass" aria-label="Toggle password visibility">
+                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+            </div>
           </div>
         </div>
         <div class="controls-row">

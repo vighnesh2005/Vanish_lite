@@ -19,6 +19,9 @@ using namespace std;
 vector<string> allowedSites;
 vector<string> blockedSites;
 vector<string> blockedCommands;
+const string USB_RESTRICTED_GROUP = "vanish-usb-noaccess";
+const string UDEV_USB_RULE_PATH = "/etc/udev/rules.d/99-vanish-usb.rules";
+const string POLKIT_USB_RULE_PATH = "/etc/polkit-1/rules.d/99-vanish-usb.rules";
 
 /* =========================
    HELPERS
@@ -423,15 +426,50 @@ void cleanupNetworkRestriction(const string& username)
    USB STORAGE
    ========================= */
 
-void disableUSB()
+void setupUSBDeactivationInfrastructure()
 {
-    // Unloading usb_storage is system-wide. Local-only policy mode avoids global actions.
-    logExam("USB disable requested but skipped (global module operations are disabled in local-only mode)");
+    // Ensure the group exists
+    system(("getent group " + USB_RESTRICTED_GROUP + " >/dev/null || groupadd " + USB_RESTRICTED_GROUP).c_str());
+
+    // Create Udev rule: block USB mass storage access for restricted users via ACLs.
+    // We target only USB block devices to avoid affecting internal drives or input devices.
+    ofstream udev(UDEV_USB_RULE_PATH);
+    if (udev) {
+        udev << "# Vanish: Block USB mass storage access for restricted users\n";
+        udev << "SUBSYSTEM==\"block\", ENV{ID_BUS}==\"usb\", RUN+=\"/usr/bin/setfacl -m g:" << USB_RESTRICTED_GROUP << ":--- $devnode\"\n";
+        udev.close();
+        system("udevadm control --reload-rules && udevadm trigger --subsystem-match=block --action=add");
+    }
+
+    // Create Polkit rule: deny unauthenticated mounting for users in the restricted group.
+    filesystem::create_directories("/etc/polkit-1/rules.d");
+    ofstream polkit(POLKIT_USB_RULE_PATH);
+    if (polkit) {
+        polkit << "/* Vanish: Deny mounting for restricted users */\n";
+        polkit << "polkit.addRule(function(action, subject) {\n";
+        polkit << "    if ((action.id == \"org.freedesktop.udisks2.filesystem-mount\" ||\n";
+        polkit << "         action.id == \"org.freedesktop.udisks2.filesystem-mount-other-seat\" ||\n";
+        polkit << "         action.id == \"org.freedesktop.udisks2.filesystem-mount-system\") &&\n";
+        polkit << "        subject.isInGroup(\"" << USB_RESTRICTED_GROUP << "\")) {\n";
+        polkit << "        return polkit.Result.NO;\n";
+        polkit << "    }\n";
+        polkit << "});\n";
+        polkit.close();
+    }
 }
 
-void enableUSB()
+void disableUSB(const string& username)
 {
-    // No-op in local-only policy mode.
+    setupUSBDeactivationInfrastructure();
+    system(("usermod -a -G " + USB_RESTRICTED_GROUP + " " + username).c_str());
+    logExam("USB storage access disabled for " + username + " (via ACL + Polkit)");
+}
+
+void enableUSB(const string& username)
+{
+    // Remove user from the restricted group
+    system(("gpasswd -d " + username + " " + USB_RESTRICTED_GROUP + " 2>/dev/null").c_str());
+    logExam("USB storage access re-enabled for " + username);
 }
 
 /* =========================
@@ -584,7 +622,7 @@ void applyPolicies(const string& username, Mode mode, const PolicyConfig& config
         }
 
         if (config.exam_disable_usb) {
-            disableUSB();
+            disableUSB(username);
         }
 
         if (config.exam_enable_persistence) {
@@ -607,7 +645,7 @@ void applyPolicies(const string& username, Mode mode, const PolicyConfig& config
         }
 
         if (config.online_disable_usb) {
-            disableUSB();
+            disableUSB(username);
         }
 
         if (config.online_enable_persistence) {
@@ -671,7 +709,7 @@ void cleanupPolicies(const string& username)
     cleanupUserTraces(username);
     disableRamHome(username);
     cleanupNetworkRestriction(username);
-    enableUSB();
+    enableUSB(username);
 
     string unmountCmd =
         "umount -l /home/" + username + "/submit 2>/dev/null";

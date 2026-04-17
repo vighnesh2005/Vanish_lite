@@ -215,6 +215,46 @@ textarea::placeholder {
   color: #a9b2bc;
 }
 
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-icon input {
+  padding-right: 44px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  color: var(--text-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 160ms ease, transform 120ms ease;
+  border-radius: 50%;
+}
+
+.password-toggle:hover {
+  color: var(--accent-primary);
+  background: rgba(25, 114, 120, 0.08);
+}
+
+.password-toggle:active {
+  transform: scale(0.92);
+}
+
+.eye-icon {
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+}
+
 select {
   appearance: none;
   cursor: pointer;

@@ -1,0 +1,28 @@
+# Build artifacts
+vanish
+vanish_user_netguard
+libvanish_netguard.so
+*.o
+*.so
+*.a
+
+# Sensitive data
+.env
+.env.private
+
+# Logs
+logs/
+*.log
+
+# Caches
+__pycache__/
+.pytest_cache/
+.codex/
+
+# Documentation / Redundant zips
+report1.zip
+report1_updated__1_.zip
+
+# OS specific
+.DS_Store
+Thumbs.db
